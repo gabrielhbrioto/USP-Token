@@ -1,0 +1,61 @@
+# --- Gerenciamento de Dependências ---
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# --- Variáveis de Ambiente (CRÍTICO) ---
+# Nunca suba seus arquivos .env, pois eles conterão chaves privadas e RPC_URLs
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env.bak
+
+# --- Smart Contracts (Solidity) ---
+# Hardhat / Truffle
+artifacts/
+cache/
+typechain/
+typechain-types/
+coverage/
+coverage.json
+
+# Foundry
+out/
+forge-cache/
+lib/               # Se você usar submodos git para dependências Foundry
+
+# --- Frontend (Next.js / React) ---
+.next/
+out/
+build/
+.vercel
+*.tsbuildinfo
+
+# --- Backend & Relayer (Node.js) ---
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Ferramentas de Monorepo ---
+.turbo/
+
+# --- IDEs e Editores ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Testes e Logs ---
+cypress/videos/
+cypress/screenshots/
+.nyc_output/
+logs/
+*.log

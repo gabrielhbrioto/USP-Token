@@ -1,0 +1,21 @@
+# Compiler files
+cache/
+out/
+
+# Ignores development broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+
+# Foundry compilation artifacts
+packages/contracts/out/
+packages/contracts/cache/
+packages/contracts/cache-forge/
+
+# Transaction logs (Deployments)
+packages/contracts/broadcast/
+
+# Security
+.env
+*.pem
+

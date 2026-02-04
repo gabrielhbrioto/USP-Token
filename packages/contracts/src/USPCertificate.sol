@@ -6,22 +6,36 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./IIdentityRegistry.sol";
 
+// Interface Oficial do Padrão EIP-5192
+interface IERC5192 {
+    /// @notice Emitted when the locking status is changed to locked.
+    /// @dev If a token is minted and the status is locked, this event should be emitted.
+    event Locked(uint256 tokenId);
+
+    /// @notice Emitted when the locking status is changed to unlocked.
+    /// @dev If a token is minted and the status is unlocked, this event should be emitted.
+    event Unlocked(uint256 tokenId);
+
+    /// @notice Returns the locking status of an Soulbound Token
+    /// @dev SBTs assigned to zero address are considered invalid, and queries
+    /// about them do throw.
+    /// @param tokenId The identifier for an SBT.
+    function locked(uint256 tokenId) external view returns (bool);
+}
+
 // Interface para interagir com a Moeda Social
 interface ISocialCurrency {
     function burnFrom(address account, uint256 amount) external;
 }
 
-contract USPCertificate is ERC721, ERC721URIStorage, AccessControl {
+contract USPCertificate is ERC721, ERC721URIStorage, AccessControl, IERC5192 {
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
     
     ISocialCurrency public socialCurrency;
     IIdentityRegistry public identityRegistry;
     
     uint256 private _nextTokenId;
-    uint256 public constant CERTIFICATE_COST = 100 * 10**18; // Exemplo: 100 moedas
-
-    // Evento para conformidade com ERC-5192 (Soulbound)
-    event Locked(uint256 tokenId);
+    uint256 public constant CERTIFICATE_COST = 100 * 10**18; // Custo fixo: 100 moedas
 
     constructor(
         address _identityRegistry, 
@@ -37,7 +51,7 @@ contract USPCertificate is ERC721, ERC721URIStorage, AccessControl {
 
     /**
      * @dev Função para o aluno resgatar um certificado.
-     * Ela queima as moedas sociais e emite o NFT.
+     * Ela queima as moedas sociais e emite o NFT já bloqueado.
      */
     function redeemCertificate(string memory metadataURI) public {
         address student = msg.sender;
@@ -52,17 +66,27 @@ contract USPCertificate is ERC721, ERC721URIStorage, AccessControl {
         _safeMint(student, tokenId);
         _setTokenURI(tokenId, metadataURI);
         
-        // 3. Emite evento de que o token está "preso" (Soulbound)
+        // 3. Emite evento obrigatório do EIP-5192
         emit Locked(tokenId);
     }
 
     /**
-     * @dev Bloqueia qualquer tentativa de transferência (Soulbound Logic).
+     * @notice Função obrigatória do EIP-5192.
+     * @dev Retorna se o token está bloqueado (Soulbound).
+     */
+    function locked(uint256 tokenId) external view override returns (bool) {
+        // Verifica se o token existe (proprietário não é endereço zero) [cite: 53]
+        require(_ownerOf(tokenId) != address(0), "Token nao existe");
+        return true; 
+    }
+
+    /**
+     * @dev Bloqueia qualquer tentativa de transferência.
      */
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = _ownerOf(tokenId);
         
-        // Permite apenas o MINT (from == address(0)) e o BURN (to == address(0))
+        // Lógica Soulbound: Permite apenas MINT (from == 0) e BURN (to == 0) [cite: 49]
         if (from != address(0) && to != address(0)) {
             revert("Tokens Soulbound nao podem ser transferidos");
         }
@@ -70,9 +94,12 @@ contract USPCertificate is ERC721, ERC721URIStorage, AccessControl {
         return super._update(to, tokenId, auth);
     }
 
-    // Funções de suporte necessárias para o ERC721URIStorage e AccessControl
+    /**
+     * @dev Atualizado para anunciar suporte ao EIP-5192 (0xb45a3c0e).
+     */
     function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721URIStorage, AccessControl) returns (bool) {
-        return super.supportsInterface(interfaceId);
+        // 0xb45a3c0e é o ID da interface EIP-5192
+        return interfaceId == type(IERC5192).interfaceId || super.supportsInterface(interfaceId);
     }
 
     function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {

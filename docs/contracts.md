@@ -191,7 +191,7 @@ Funções externas (implementações do IPaymaster)
 
 Funções administrativas
 - `function setTargetWhitelist(address target, bool status) external onlyOwner` — adiciona/retira um alvo da whitelist.
-- `function make_deposit() external payable` — faz depositTo no `entryPoint` usando `msg.value`.
+- `function makeDeposit() external payable` — faz depositTo no `entryPoint` usando `msg.value`.
 - `function withdrawTo(address payable withdrawAddress, uint256 amount) external onlyOwner` — retira fundos do `entryPoint` para `withdrawAddress`.
 
 Funções utilitárias

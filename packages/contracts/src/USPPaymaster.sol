@@ -12,7 +12,6 @@ contract USPPaymaster is IPaymaster, Ownable {
     
     mapping(address => uint256) public gasSpentByStudent;
     
-    // Agora variável
     uint256 public maxGasPerStudent = 0.05 ether;
 
     mapping(address => bool) public whitelistedTargets;

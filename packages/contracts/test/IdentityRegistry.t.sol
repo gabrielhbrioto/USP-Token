@@ -9,16 +9,21 @@ contract IdentityRegistryTest is Test {
     address public admin = address(1);
     address public student = address(2);
 
+    /// @dev Configuração inicial antes de cada teste
     function setUp() public {
         vm.startPrank(admin);
         registry = new IdentityRegistry(admin);
         vm.stopPrank();
     }
 
+    /// @dev Testa a adição de um estudante e verifica se o contador e o bloco são definidos corretamente
     function test_AddStudent_IncrementsCountAndSetsBlock() public {
         vm.startPrank(admin);
         
+        // Captura o bloco antes da adição
         uint256 blockBefore = block.number;
+
+        // Adiciona estudante
         registry.addStudent(student, "12345");
         
         // Verifica contagem
@@ -29,9 +34,11 @@ contract IdentityRegistryTest is Test {
         assertTrue(isActive);
         assertEq(id, "12345");
         assertEq(regBlock, blockBefore); // Deve ser o bloco atual
+        
         vm.stopPrank();
     }
 
+    /// @dev Testa a lógica de snapshot para estudantes
     function test_SnapshotLogic() public {
         vm.startPrank(admin);
         
@@ -52,16 +59,22 @@ contract IdentityRegistryTest is Test {
         vm.stopPrank();
     }
 
+    /// @dev Testa a atualização do status do estudante e o contador correspondente
     function test_SetStudentStatus_UpdatesCount() public {
         vm.startPrank(admin);
+
+        // Adiciona estudante e verifica contagem
         registry.addStudent(student, "12345");
         assertEq(registry.activeStudentCount(), 1);
 
+        // Desativa estudante e verifica contagem
         registry.setStudentStatus(student, false);
         assertEq(registry.activeStudentCount(), 0);
         
+        // Reativa estudante e verifica contagem
         registry.setStudentStatus(student, true);
         assertEq(registry.activeStudentCount(), 1);
+        
         vm.stopPrank();
     }
 }

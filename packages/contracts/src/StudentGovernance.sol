@@ -10,19 +10,21 @@ interface IIdentityRegistryGov {
     function activeStudentCount() external view returns (uint256);
 }
 
-interface IMintableToken {
+interface IGovernanceToken is IERC20 {
     function mint(address to, uint256 amount) external;
+    function burn(uint256 amount) external;
 }
 
 contract StudentGovernance is AccessControl, ReentrancyGuard {
     IIdentityRegistryGov public identityRegistry;
-    IMintableToken public token;
+    IGovernanceToken public token;
 
     // --- Parâmetros de Governança (Variáveis) ---
     uint256 public quorumPercentage = 15; // Ex: 15%
     uint256 public votingPeriod = 2 days; // Duração padrão
     uint256 public voteReward = 5 * 10**18; // 5 Tokens por voto
-
+    uint256 public proposalCost = 50 * 10**18;
+    
     struct Proposal {
         address target;         // Contrato a ser alterado (Token, Certificado, Paymaster, ou Governance)
         bytes callData;         // A função e argumentos a executar (ex: setCertificateCost(200))
@@ -33,6 +35,8 @@ contract StudentGovernance is AccessControl, ReentrancyGuard {
         uint256 noVotes;
         uint256 totalVotes;
         bool executed;
+        address proposer;      
+        bool depositReturned;  
         mapping(address => bool) hasVoted;
     }
 
@@ -43,21 +47,20 @@ contract StudentGovernance is AccessControl, ReentrancyGuard {
     event VoteCast(address indexed voter, uint256 indexed proposalId, bool support);
     event ProposalExecuted(uint256 indexed id);
     event GovernanceParamsUpdated(uint256 newQuorum, uint256 newPeriod, uint256 newReward);
+    event ProposalRejected(uint256 indexed id, bool quorumMet, bool approved);
 
     constructor(address _identityRegistry, address _token, address _admin) {
         identityRegistry = IIdentityRegistryGov(_identityRegistry);
-        token = IMintableToken(_token);
+        token = IGovernanceToken(_token);
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
     }
 
-    // Cria uma proposta para alterar QUALQUER coisa no sistema
-    function propose(
-        address _target, 
-        bytes memory _callData, 
-        string memory _description
-    ) external {
-        // Valida snapshot simples (deve ser ativo agora para propor)
+    function propose(address _target, bytes memory _callData, string memory _description) external {
         require(identityRegistry.isStudentValidForSnapshot(msg.sender, block.number), "Apenas alunos ativos");
+
+        // COBRANÇA DA CAUÇÃO
+        // O aluno precisa ter dado 'approve' no token para o contrato de governança antes
+        require(token.transferFrom(msg.sender, address(this), proposalCost), "Falha no deposito da caucao");
 
         Proposal storage p = proposals[nextProposalId];
         p.target = _target;
@@ -65,6 +68,7 @@ contract StudentGovernance is AccessControl, ReentrancyGuard {
         p.description = _description;
         p.snapshotBlock = block.number;
         p.votingDeadline = block.timestamp + votingPeriod;
+        p.proposer = msg.sender; // Salva o dono da proposta
 
         emit ProposalCreated(nextProposalId, _description, p.votingDeadline);
         nextProposalId++;
@@ -101,25 +105,54 @@ contract StudentGovernance is AccessControl, ReentrancyGuard {
 
     function execute(uint256 proposalId) external nonReentrant {
         Proposal storage p = proposals[proposalId];
+        
+        // 1. Validações de Tempo e Estado (Essas AINDA devem reverter se falharem)
         require(block.timestamp >= p.votingDeadline, "Votacao em andamento");
-        require(!p.executed, "Ja executada");
+        require(!p.executed, "Ja processada");
 
-        // --- CÁLCULO DE QUORUM ---
+        p.executed = true; // Marca como processada para evitar reentrância/duplicação
+
+        // 2. Cálculos de Aprovação
         uint256 totalStudents = identityRegistry.activeStudentCount();
         uint256 requiredVotes = (totalStudents * quorumPercentage) / 100;
-        
-        // Trava de segurança mínima (ex: min 3 votos sempre)
         if (requiredVotes < 3) requiredVotes = 3;
 
-        require(p.totalVotes >= requiredVotes, "Quorum nao atingido");
+        bool quorumMet = p.totalVotes >= requiredVotes;
+        bool approved = p.yesVotes > p.noVotes;
 
-        p.executed = true;
+        // 3. O Grande IF/ELSE (A Mágica acontece aqui)
+        if (quorumMet && approved) {
+            // --- CENÁRIO DE SUCESSO ---
+            
+            // Devolve a caução
+            if (!p.depositReturned) {
+                p.depositReturned = true;
+                token.transfer(p.proposer, proposalCost); // Devolve
+            }
 
-        if (p.yesVotes > p.noVotes) {
-            // Executa a chamada no contrato alvo
+            // Executa a ação
             (bool success, ) = p.target.call(p.callData);
-            require(success, "Falha na execucao da proposta");
+            require(success, "Falha na chamada externa"); // Este revert é ok, pois é falha técnica
+            
             emit ProposalExecuted(proposalId);
+
+        } else {
+            // --- CENÁRIO DE FRACASSO (Spam, rejeição ou falta de quórum) ---
+            
+            // A caução é queimada (ou enviada para o tesouro)
+            p.depositReturned = true; // Marca como "lidada"
+            
+            // Tenta queimar (usando try/catch caso o token não suporte burn ou falhe)
+            try token.burn(proposalCost) {
+                // Queimou com sucesso
+            } catch {
+                // Se falhar o burn, envia para endereço morto para garantir punição
+                token.transfer(address(0xdead), proposalCost);
+            }
+            
+            // Não emite ProposalExecuted, pois falhou.
+            // Pode emitir um evento de falha se quiser:
+            emit ProposalRejected(proposalId, quorumMet, approved);
         }
     }
 

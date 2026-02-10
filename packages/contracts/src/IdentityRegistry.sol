@@ -9,11 +9,11 @@ contract IdentityRegistry is AccessControl {
     struct Student {
         bool isActive;
         string studentId;
-        uint256 registrationBlock; // Novo: Para Snapshot
+        uint256 registrationBlock; // Para Snapshot
     }
 
     mapping(address => Student) public students;
-    uint256 public activeStudentCount; // Novo: Para cálculo de quórum dinâmico
+    uint256 public activeStudentCount; // Para cálculo de quórum dinâmico
 
     event StudentAdded(address indexed studentAddress, string studentId);
     event StudentStatusChanged(address indexed studentAddress, bool isActive);
@@ -45,7 +45,8 @@ contract IdentityRegistry is AccessControl {
             if (status) {
                 activeStudentCount++;
             } else {
-                activeStudentCount--;
+                // Evita underflow por segurança
+                if (activeStudentCount > 0) activeStudentCount--;
             }
             emit StudentStatusChanged(studentAddress, status);
         }
@@ -58,7 +59,7 @@ contract IdentityRegistry is AccessControl {
     // Novo: Verifica se era ativo E se já existia no bloco do snapshot
     function isStudentValidForSnapshot(address student, uint256 snapshotBlock) external view returns (bool) {
         Student memory s = students[student];
-        // O aluno deve estar ativo E ter sido registrado ANTES ou NO MESMO bloco da proposta
+        if (s.registrationBlock == 0) return false;
         return s.isActive && s.registrationBlock <= snapshotBlock;
     }
 }

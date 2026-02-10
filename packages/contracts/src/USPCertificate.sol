@@ -18,7 +18,6 @@ contract USPCertificate is ERC721, ERC721URIStorage, AccessControl, IERC5192 {
     
     uint256 private _nextTokenId;
     
-    // Agora é uma variável, não constante
     uint256 public certificateCost = 100 * 10**18; 
 
     event CostUpdated(uint256 newCost);
@@ -53,7 +52,6 @@ contract USPCertificate is ERC721, ERC721URIStorage, AccessControl, IERC5192 {
         emit Locked(tokenId);
     }
 
-    // ... (Funções locked, supportsInterface, _update, tokenURI mantidas iguais) ...
     function locked(uint256 tokenId) external view override returns (bool) {
         require(_ownerOf(tokenId) != address(0), "Token nao existe");
         return true; 

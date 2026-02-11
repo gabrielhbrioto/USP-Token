@@ -46,6 +46,7 @@ forge script script/DeployUSP.s.sol \
     --rpc-url $SEPOLIA_RPC_URL \
     --broadcast \
     --verify \
+    --slow \
     -vvvv 
 ```
 

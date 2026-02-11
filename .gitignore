@@ -25,7 +25,8 @@ coverage.json
 # Foundry
 out/
 forge-cache/
-lib/               # Se você usar submodos git para dependências Foundry
+lib/       
+broadcast/        
 
 # --- Frontend (Next.js / React) ---
 .next/

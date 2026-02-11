@@ -43,11 +43,10 @@ Para enviar a transação para a rede (on-chain), utilizamos a flag `--broadcast
 
 ```bash
 forge script script/DeployUSP.s.sol \
-    --rpc-url $RPC_URL \
-    --private-key $PRIVATE_KEY \
+    --rpc-url $SEPOLIA_RPC_URL \
     --broadcast \
     --verify \
-    -vvvv
+    -vvvv 
 ```
 
 **Explicação das Flags:**

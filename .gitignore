@@ -62,3 +62,6 @@ logs/
 
 # --- Anotações ---
 annotations.txt
+
+# --- Resultados de Deploy ---
+packages/contracts/broadcast/

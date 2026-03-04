@@ -1,7 +1,7 @@
 # ==========================================
 # Estágio 1: Builder (Compilação)
 # ==========================================
-FROM golang:1.22.3-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Define o diretório de trabalho dentro do container
 WORKDIR /app
@@ -22,7 +22,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o relayer-api ./cmd/server/main.go
 # ==========================================
 # Estágio 2: Runner (Execução)
 # ==========================================
-FROM alpine:3.19.1
+FROM alpine:latest
 
 # Atualiza os pacotes e instala certificados CA para reduzir vulnerabilidades
 RUN apk update && apk upgrade && apk --no-cache add ca-certificates

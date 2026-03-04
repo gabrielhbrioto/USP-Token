@@ -3,50 +3,54 @@ package service
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/gabrielhbrioto/usp-project/relayer/internal/config"
-	"github.com/gabrielhbrioto/usp-project/relayer/pkg/contracts"
+	"github.com/gabrielhbrioto/Usp-Token/packages/relayer-bundler/internal/config"
+	"github.com/gabrielhbrioto/Usp-Token/packages/relayer-bundler/pkg/contracts"
 )
 
+// 1. Interfaces que representam as funções que precisamos da blockchain
+type ChainClient interface {
+	ChainID(ctx context.Context) (*big.Int, error)
+}
+
+type EntryPointContract interface {
+	HandleOps(opts *bind.TransactOpts, ops []contracts.UserOperation, beneficiary common.Address) (*types.Transaction, error)
+}
+
+// 2. A struct agora depende das interfaces, não das implementações concretas
 type RelayerService struct {
-	client     *ethclient.Client
+	client     ChainClient
 	cfg        *config.Config
-	entryPoint *contracts.EntryPoint
+	entryPoint EntryPointContract
 }
 
-func NewRelayerService(cfg *config.Config) (*RelayerService, error) {
-	client, err := ethclient.Dial(cfg.RpcUrl)
-	if err != nil {
-		return nil, err
+// 3. O construtor recebe as dependências prontas
+func NewRelayerService(cfg *config.Config, client ChainClient, ep EntryPointContract) *RelayerService {
+	return &RelayerService{
+		client:     client,
+		cfg:        cfg,
+		entryPoint: ep,
 	}
-
-	address := common.HexToAddress(cfg.EntryPointAddr)
-	ep, err := contracts.NewEntryPoint(address, client)
-	if err != nil {
-		return nil, err
-	}
-
-	return &RelayerService{client: client, cfg: cfg, entryPoint: ep}, nil
 }
 
-// SendBundle recebe a UserOperation (struct simplificada aqui) e envia
 func (s *RelayerService) SendBundle(userOp contracts.UserOperation) (string, error) {
-	// 1. Carregar chave privada do Bundler
-	privateKey, _ := crypto.HexToECDSA(s.cfg.PrivateKey)
+	privateKey, err := crypto.HexToECDSA(s.cfg.PrivateKey)
+	if err != nil {
+		return "", fmt.Errorf("chave privada invalida: %v", err)
+	}
 
-	// 2. Criar TransactOpts (autenticação do bundler)
-	chainId, _ := s.client.ChainID(context.Background())
+	chainId, err := s.client.ChainID(context.Background())
+	if err != nil {
+		return "", fmt.Errorf("falha ao obter chainID: %v", err)
+	}
+
 	auth, _ := bind.NewKeyedTransactorWithChainID(privateKey, chainId)
-
-	// 3. Empacotar a UserOp (Array de 1 item)
 	ops := []contracts.UserOperation{userOp}
-
-	// 4. Chamar handleOps no contrato EntryPoint
-	// OBS: O 'beneficiary' é o endereço que recebe as taxas (o próprio bundler)
 	bundlerAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
 
 	tx, err := s.entryPoint.HandleOps(auth, ops, bundlerAddress)

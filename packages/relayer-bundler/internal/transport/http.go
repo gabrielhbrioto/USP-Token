@@ -3,8 +3,8 @@ package transport
 import (
 	"net/http"
 
-	"github.com/gabrielhbrioto/usp-project/relayer/internal/service"
-	"github.com/gabrielhbrioto/usp-project/relayer/pkg/contracts"
+	"github.com/gabrielhbrioto/Usp-Token/packages/relayer-bundler/internal/service"
+	"github.com/gabrielhbrioto/Usp-Token/packages/relayer-bundler/pkg/contracts"
 	"github.com/gin-gonic/gin"
 )
 

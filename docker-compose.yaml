@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  relayer-api:
+    build:
+      context: ./packages/relayer-bundler
+      dockerfile: Dockerfile(1)
+    ports:
+      - "${RELAYER_PORT:-8080}:8080"
+    restart: unless-stopped
+    networks:
+      - usp-network
+    # O Go aceita variáveis em tempo de execução nativamente
+    environment:
+      - PORT=${RELAYER_PORT}
+      - GIN_MODE=release
+
+  usp-dapp:
+    build:
+      context: ./packages/dapp/usp-coin-interface
+      dockerfile: Dockerfile
+      # Aqui injetamos a variável no momento do BUILD para o Vite
+      args:
+        - VITE_RELAYER_URL=${VITE_RELAYER_URL}
+    ports:
+      - "80:80"
+    depends_on:
+      - relayer-api
+    restart: unless-stopped
+    networks:
+      - usp-network
+
+networks:
+  usp-network:
+    driver: bridge

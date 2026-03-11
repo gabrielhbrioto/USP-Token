@@ -29,8 +29,15 @@ func main() {
 		log.Fatal("Erro ao instanciar EntryPoint:", err)
 	}
 
-	// Injetamos as dependências reais no serviço
-	svc := service.NewRelayerService(cfg, client, ep)
+	// --- NOVO: Instanciamos o IdentityRegistry real ---
+	registryAddr := common.HexToAddress(cfg.IdentityRegistryAddr)
+	idReg, err := contracts.NewIdentityRegistry(registryAddr, client)
+	if err != nil {
+		log.Fatal("Erro ao instanciar IdentityRegistry:", err)
+	}
+
+	// Passamos o 'idReg' como o 4º parâmetro
+	svc := service.NewRelayerService(cfg, client, ep, idReg)
 	r := transport.SetupRouter(svc)
 
 	log.Printf("Relayer rodando na porta %s", cfg.Port)

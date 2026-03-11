@@ -10,6 +10,8 @@ type Config struct {
 	PrivateKey    string
 	EntryPointAddr string
 	Port          string
+	GoogleClientID       string
+	IdentityRegistryAddr string
 }
 
 func Load() (*Config, error) {
@@ -19,6 +21,8 @@ func Load() (*Config, error) {
 		PrivateKey:    os.Getenv("BUNDLER_PRIVATE_KEY"),
 		EntryPointAddr: os.Getenv("ENTRYPOINT_ADDRESS"),
 		Port:          getEnv("PORT", "8080"),
+		GoogleClientID:       os.Getenv("GOOGLE_CLIENT_ID"),      
+		IdentityRegistryAddr: os.Getenv("IDENTITY_REGISTRY_ADDRESS"),
 	}, nil
 }
 

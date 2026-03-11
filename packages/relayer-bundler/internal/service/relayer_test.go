@@ -46,7 +46,7 @@ func TestSendBundle_Success(t *testing.T) {
 	}
 
 	// 2. Injeta os Mocks no serviço
-	svc := NewRelayerService(cfg, &MockChainClient{}, &MockEntryPoint{})
+	svc := NewRelayerService(cfg, &MockChainClient{}, &MockEntryPoint{}, nil)
 
 	// 3. Cria uma UserOperation vazia (irrelevante para este teste de infra)
 	mockOp := contracts.UserOperation{}
@@ -85,7 +85,7 @@ func TestSendBundle_Failure_ContractRevert(t *testing.T) {
 	}
 
 	// 2. Injeta o Mock de SUCESSO para o Client, mas o Mock de ERRO para o EntryPoint
-	svc := NewRelayerService(cfg, &MockChainClient{}, &MockEntryPointError{})
+	svc := NewRelayerService(cfg, &MockChainClient{}, &MockEntryPointError{}, nil)
 
 	// 3. Cria a UserOperation
 	mockOp := contracts.UserOperation{}

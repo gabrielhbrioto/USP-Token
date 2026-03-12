@@ -29,7 +29,6 @@ func main() {
 		log.Fatal("Erro ao instanciar EntryPoint:", err)
 	}
 
-	// --- NOVO: Instanciamos o IdentityRegistry real ---
 	registryAddr := common.HexToAddress(cfg.IdentityRegistryAddr)
 	idReg, err := contracts.NewIdentityRegistry(registryAddr, client)
 	if err != nil {

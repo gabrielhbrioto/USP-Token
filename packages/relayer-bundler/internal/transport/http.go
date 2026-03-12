@@ -5,6 +5,7 @@ import (
 
 	"github.com/gabrielhbrioto/Usp-Token/packages/relayer-bundler/internal/service"
 	"github.com/gabrielhbrioto/Usp-Token/packages/relayer-bundler/pkg/contracts"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,6 +16,13 @@ type RegisterRequest struct {
 
 func SetupRouter(svc *service.RelayerService) *gin.Engine {
 	r := gin.Default()
+
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowOrigins = []string{"http://localhost:8081"} 
+	corsConfig.AllowMethods = []string{"POST", "GET", "OPTIONS"}
+	corsConfig.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	
+	r.Use(cors.New(corsConfig))
 
 	r.POST("/relay", func(c *gin.Context) {
 		var userOp contracts.UserOperation // Struct gerada pelo abigen

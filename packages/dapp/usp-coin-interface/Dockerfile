@@ -13,9 +13,6 @@ RUN npm install
 # Copia o resto do código do projeto
 COPY . .
 
-ARG VITE_RELAYER_URL
-ENV VITE_RELAYER_URL=$VITE_RELAYER_URL
-
 # Roda o comando do Vite para gerar a pasta /dist com os arquivos otimizados
 RUN npm run build
 

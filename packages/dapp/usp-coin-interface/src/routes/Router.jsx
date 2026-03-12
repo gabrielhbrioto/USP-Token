@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { DefaultLayout } from '../layouts/DefaultLayout';
-import { Home } from '../pages/Home';
+import { Login } from '../pages/Login';
 import { Authentication } from '../pages/Authentication';
 import { Certificates } from '../pages/Certificates';
 import { Governance } from '../pages/Governance';
@@ -8,43 +8,85 @@ import { IdentityManagement } from '../pages/IdentityManagement';
 import { PaymasterManagement } from '../pages/PaymasterManagement';
 import { SystemParameters } from '../pages/SystemParameters';
 import { Wallet } from '../pages/Wallet';
+import { Dashboard } from '../pages/Dashboard';
+import { ProtectedRoute } from './ProtectedRoutes';
+import { AuthProvider } from '../contexts/AuthContext';
+import { Outlet } from 'react-router-dom';
+
+const RootLayout = () => {
+  return (
+    <AuthProvider>
+      <Outlet />
+    </AuthProvider>
+  );
+};
 
 export const router = createBrowserRouter([
   {
-    path: '/',
-    element: <DefaultLayout />, // O Layout é o elemento pai
+    element: <RootLayout />,
     children: [
+      // 1º Grupo: Sem Navbar (Home/Login e Auth)
       {
-        path: '/', // Quando a URL for apenas "/", renderiza a Home dentro do Layout
-        element: <Home />,
+        path: '/',
+        element: <DefaultLayout showNavbar={false} />, // Passando uma prop se quiser reaproveitar
+        children: [
+          { path: '/', element: <Login /> },
+          { path: '/auth', element: <ProtectedRoute><Authentication /></ProtectedRoute> },
+        ],
       },
+      // 2º Grupo: Com Navbar (Todas as outras rotas protegidas)
       {
-        path: '/auth', // Quando for "/auth", renderiza o Authentication dentro do Layout
-        element: <Authentication />,
-      },
-      {
-        path: '/certificates', // Quando for "/certificates", renderiza o Certificates dentro do Layout
-        element: <Certificates />,
-      },
-      {
-        path: '/governance', // Quando for "/governance", renderiza o Governance dentro do Layout
-        element: <Governance />,
-      },
-      {
-        path: '/identity-management', // Quando for "/identity-management", renderiza o IdentityManagement dentro do Layout
-        element: <IdentityManagement />,
-      },
-      {
-        path: '/paymaster-management', // Quando for "/paymaster-management", renderiza o PaymasterManagement dentro do Layout
-        element: <PaymasterManagement />,
-      },
-      {
-        path: '/system-parameters', // Quando for "/system-parameters", renderiza o SystemParameters dentro do Layout
-        element: <SystemParameters />,
-      },
-      {
-        path: '/wallet', // Quando for "/wallet", renderiza o Wallet dentro do Layout
-        element: <Wallet />,
+        element: <DefaultLayout showNavbar={true} />, 
+        children: [
+          { 
+            path: '/dashboard', 
+            element: 
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute> 
+          },
+          { 
+            path: '/certificates', 
+            element: 
+              <ProtectedRoute>
+                <Certificates />
+              </ProtectedRoute> 
+          },
+          { 
+            path: '/governance', 
+            element: 
+              <ProtectedRoute>
+                <Governance />
+              </ProtectedRoute> 
+          },
+          { 
+            path: '/identity-management', 
+            element: 
+              <ProtectedRoute>
+                <IdentityManagement />
+              </ProtectedRoute> 
+          },
+          { 
+            path: '/paymaster-management', 
+            element: 
+              <ProtectedRoute>
+                <PaymasterManagement /></ProtectedRoute> 
+          },
+          { 
+            path: '/system-parameters', 
+            element: 
+              <ProtectedRoute>
+                <SystemParameters />
+              </ProtectedRoute> 
+          },
+          { 
+            path: '/wallet', 
+            element: 
+              <ProtectedRoute>
+                <Wallet />
+              </ProtectedRoute> 
+          },
+        ],
       },
     ],
   },

@@ -74,7 +74,7 @@ export function Authentication() {
       // 4. Sucesso e Redirecionamento
       // Aqui, o ideal é atualizar o `localStorage` e o estado do Context para isRegistered: true
       alert("Identidade registrada com sucesso na blockchain!");
-      navigate('/dashboard');
+      navigate('/wallet');
 
     } catch (error) {
       console.error("Erro durante o registro:", error);

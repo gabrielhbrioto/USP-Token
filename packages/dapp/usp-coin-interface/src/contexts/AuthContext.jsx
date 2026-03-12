@@ -65,7 +65,7 @@ export function AuthProvider({ children }) {
                     if (!isRegisteredOnChain) {
                         navigate('/cadastro'); // Força ele a passar pelo fluxo de registro novamente
                     } else {
-                        navigate('/dashboard'); // Caso ele tenha sido aprovado em background
+                        navigate('/wallet'); // Caso ele tenha sido aprovado em background
                     }
                   }
                 }
@@ -164,7 +164,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem('@USPToken:user', JSON.stringify(userData));
       
       // Redireciona para o Dashboard (que renderiza a sua Wallet)
-      navigate('/dashboard');
+      navigate('/wallet');
 
     } catch (error) {
       console.error("Erro no Login/Registro:", error.message);

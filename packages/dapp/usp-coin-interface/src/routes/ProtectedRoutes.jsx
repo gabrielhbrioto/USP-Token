@@ -21,7 +21,7 @@ export function ProtectedRoute({ children }) {
   }
 
   // Se o usuário está logado mas não está registrado no IdentityRegistry, trava na tela de cadastro
-  // (Isso impede que ele force a URL /dashboard pelo navegador sem ter a identidade cunhada)
+  // (Isso impede que ele force a URL /wallet pelo navegador sem ter a identidade cunhada)
   if (user && !user.isRegistered && window.location.pathname !== '/auth') {
     return <Navigate to="/auth" replace />;
   }

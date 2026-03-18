@@ -1,19 +1,48 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	// "encoding/json"
 	"fmt"
+	"image/jpeg"
 	"math/big"
 	"strings"
-	"google.golang.org/api/idtoken"
+	"os"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/fogleman/gg"
 	"github.com/gabrielhbrioto/Usp-Token/packages/relayer-bundler/internal/config"
 	"github.com/gabrielhbrioto/Usp-Token/packages/relayer-bundler/pkg/contracts"
+	"google.golang.org/api/idtoken"
 )
+
+type CertificateRequest struct {
+	StudentName        string `json:"studentName"`
+	CourseName         string `json:"courseName"`
+	Hours              string `json:"hours"`
+	StartDate          string `json:"startDate"`
+	EndDate            string `json:"endDate"`
+	GradePercent       string `json:"gradePercent"`
+	DirectorName       string `json:"directorName"`
+	DirectorTitle      string `json:"directorTitle"`
+	CoordinatorName    string `json:"coordinatorName"`
+	CoordinatorTitle   string `json:"coordinatorTitle"`
+	EmissionDay        string `json:"emissionDay"`
+	EmissionMonth      string `json:"emissionMonth"`
+	EmissionYear       string `json:"emissionYear"`
+	VerificationCode   string `json:"verificationCode"`
+}
+
+type textConfig struct {
+	boldPath    string
+	regularPath string
+	mainColor   string
+	dataColor   string
+}
 
 // 1. Interfaces que representam as funções que precisamos da blockchain
 type ChainClient interface {
@@ -110,4 +139,99 @@ func (s *RelayerService) RegisterStudent(ctx context.Context, tokenString string
 	}
 
 	return tx.Hash().Hex(), nil
+}
+
+func getAssetPath(filename string) string {
+	pathRoot := "assets/" + filename
+	if _, err := os.Stat(pathRoot); err == nil {
+		return pathRoot
+	}
+	pathTest := "../../assets/" + filename
+	if _, err := os.Stat(pathTest); err == nil {
+		return pathTest
+	}
+	return filename // fallback
+}
+
+func (s *RelayerService) GenerateCertificateImage(req CertificateRequest) ([]byte, error) {
+	txtCfg := textConfig{
+		boldPath:    getAssetPath("Roboto-Bold.ttf"),
+		regularPath: getAssetPath("Roboto-Regular.ttf"),
+		mainColor:   "#2C3E50", 
+		dataColor:   "#333333", 
+	}
+
+	img, err := gg.LoadImage(getAssetPath("template-certificado.png")) // Certifique-se de que este é o template LIMPO
+	if err != nil {
+		return nil, fmt.Errorf("falha ao carregar o template: %v", err)
+	}
+
+	bounds := img.Bounds()
+	dc := gg.NewContext(bounds.Dx(), bounds.Dy())
+	dc.DrawImage(img, 0, 0)
+
+	// Transformamos em float para usar cálculo percentual
+	W := float64(bounds.Dx())
+	H := float64(bounds.Dy())
+
+	// Tamanhos de fonte dinâmicos baseados na altura da imagem
+	titleFontSize := H * 0.045
+	courseFontSize := H * 0.035
+	normalFontSize := H * 0.025
+	signatureFontSize := H * 0.030
+	signatureTitleFontSize := H * 0.020
+
+	// --- 1. Títulos Principais (Bold) ---
+	dc.SetHexColor(txtCfg.mainColor)
+
+	// Nome do Aluno
+	dc.LoadFontFace(txtCfg.boldPath, titleFontSize)
+	dc.DrawStringAnchored(req.StudentName, W*0.50, H*0.275, 0.5, 0.5)
+
+	// Nome do Curso
+	dc.LoadFontFace(txtCfg.boldPath, courseFontSize)
+	dc.DrawStringAnchored(req.CourseName, W*0.50, H*0.385, 0.5, 0.5)
+
+	// --- 2. Dados Detalhados (Regular) ---
+	dc.SetHexColor(txtCfg.dataColor)
+	dc.LoadFontFace(txtCfg.regularPath, normalFontSize)
+
+	// Linha de Caixas (Carga Horária, Período, Nível)
+	yRow1 := H * 0.505
+	dc.DrawStringAnchored(req.Hours, W*0.215, yRow1, 0.5, 0.5)
+	dc.DrawStringAnchored(req.StartDate+" a "+req.EndDate, W*0.50, yRow1, 0.5, 0.5)
+	dc.DrawStringAnchored(req.GradePercent, W*0.785, yRow1, 0.5, 0.5)
+
+	// Data de Emissão
+	yEmission := H * 0.675
+	dc.DrawStringAnchored(req.EmissionDay, W*0.46, yEmission, 0.5, 0.5)
+	dc.DrawStringAnchored(req.EmissionMonth, W*0.54, yEmission, 0.5, 0.5)
+	dc.DrawStringAnchored(req.EmissionYear, W*0.63, yEmission, 0.5, 0.5)
+
+	// Código de Verificação
+	yVerify := H * 0.895
+	dc.DrawStringAnchored(req.VerificationCode, W*0.60, yVerify, 0.5, 0.5)
+
+	// --- 3. Assinaturas ---
+	ySignName := H * 0.78  // Logo acima da linha
+	ySignTitle := H * 0.87 // Abaixo do texto estático "Diretor/Coordenador"
+
+	// Nomes (Bold)
+	dc.SetHexColor(txtCfg.mainColor)
+	dc.LoadFontFace(txtCfg.boldPath, signatureFontSize)
+	dc.DrawStringAnchored(req.DirectorName, W*0.25, ySignName, 0.5, 0.5)
+	dc.DrawStringAnchored(req.CoordinatorName, W*0.75, ySignName, 0.5, 0.5)
+
+	// Cargos (Regular)
+	dc.SetHexColor(txtCfg.dataColor)
+	dc.LoadFontFace(txtCfg.regularPath, signatureTitleFontSize)
+	dc.DrawStringAnchored(req.DirectorTitle, W*0.25, ySignTitle, 0.5, 0.5)
+	dc.DrawStringAnchored(req.CoordinatorTitle, W*0.75, ySignTitle, 0.5, 0.5)
+
+	buf := new(bytes.Buffer)
+	if err := jpeg.Encode(buf, dc.Image(), &jpeg.Options{Quality: 95}); err != nil {
+		return nil, fmt.Errorf("falha ao encodar a imagem gerada: %v", err)
+	}
+
+	return buf.Bytes(), nil
 }

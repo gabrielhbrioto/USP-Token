@@ -1,9 +1,12 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"image/jpeg"
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -37,7 +40,7 @@ func (m *MockEntryPoint) HandleOps(opts *bind.TransactOpts, ops []contracts.User
 	return fakeTx, nil
 }
 
-// --- TESTE ---
+// --- TESTES DE BLOCKCHAIN ---
 
 func TestSendBundle_Success(t *testing.T) {
 	// 1. Prepara a configuração com uma chave privada válida (aleatória para teste)
@@ -76,8 +79,6 @@ func (m *MockEntryPointError) HandleOps(opts *bind.TransactOpts, ops []contracts
 	return nil, fmt.Errorf("execution reverted: AA21 didn't pay prefund")
 }
 
-// --- TESTE DE FALHA ---
-
 func TestSendBundle_Failure_ContractRevert(t *testing.T) {
 	// 1. Prepara a configuração com uma chave válida para não falhar na etapa de criptografia
 	cfg := &config.Config{
@@ -112,4 +113,56 @@ func TestSendBundle_Failure_ContractRevert(t *testing.T) {
 	}
 
 	t.Logf("Teste de falha passou! Erro capturado com sucesso: %v", err)
+}
+
+// --- TESTES DE IMAGEM ---
+
+func TestGenerateCertificateImage(t *testing.T) {
+	// 1. Setup
+	svc := &RelayerService{}
+
+	// Preenche uma requisição completa com dados de teste
+	req := CertificateRequest{
+		StudentName:        "GABRIEL HENRIQUE BRIOTO", // Caps para bold ficar mais visível
+		CourseName:         "ENGENHARIA DE COMPUTAÇÃO WEB3", // Caps para bold
+		Hours:              "40",
+		StartDate:          "17/03/2026",
+		EndDate:            "17/04/2026",
+		GradePercent:       "95",
+		DirectorName:       "Prof. Dr. Fulano de Tal",
+		DirectorTitle:      "Diretor da Poli-USP",
+		CoordinatorName:    "Ciclana de Souza",
+		CoordinatorTitle:   "Coordenadora do Curso",
+		EmissionDay:        "17",
+		EmissionMonth:      "03",
+		EmissionYear:       "2026",
+		VerificationCode:   "USP-12345678",
+	}
+
+	// 2. Execução
+	imgBytes, err := svc.GenerateCertificateImage(req)
+
+	// 3. Asserções (Verificações)
+	if err != nil {
+		t.Fatalf("Esperava erro nil, mas obteve: %v\nVerifique se os arquivos de template e fonte existem na pasta assets/.", err)
+	}
+
+	if len(imgBytes) == 0 {
+		t.Fatalf("Esperava um slice de bytes preenchido, mas obteve 0 bytes")
+	}
+
+	// 4. Validação de formato
+	// Tenta decodificar o slice de bytes para garantir que é um JPEG estruturalmente válido
+	_, err = jpeg.Decode(bytes.NewReader(imgBytes))
+	if err != nil {
+		t.Errorf("Os bytes retornados não formam um JPEG válido: %v", err)
+	}
+
+	// 5. Salvar a imagem no disco para visualização física (opcional)
+	err = os.WriteFile("resultado_teste_certificado_ajustado.jpg", imgBytes, 0644)
+	if err != nil {
+		t.Fatalf("Falha ao salvar a imagem de teste no disco: %v", err)
+	}
+
+	t.Log("Sucesso! Imagem salva como 'resultado_teste_certificado_ajustado.jpg'")
 }

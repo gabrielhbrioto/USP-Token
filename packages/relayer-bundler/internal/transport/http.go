@@ -63,5 +63,26 @@ func SetupRouter(svc *service.RelayerService) *gin.Engine {
 		})
 	})
 
+	// Nova rota para gerar o certificado em memória
+	r.POST("/certificate/generate", func(c *gin.Context) {
+		var req service.CertificateRequest
+
+		// Bind JSON para a struct do serviço
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "JSON invalido"})
+			return
+		}
+
+		// Chama o serviço para gerar os bytes da imagem
+		imgBytes, err := svc.GenerateCertificateImage(req)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// No Gin, retornamos bytes brutos (como imagens) usando c.Data
+		c.Data(http.StatusOK, "image/jpeg", imgBytes)
+	})
+
 	return r
 }

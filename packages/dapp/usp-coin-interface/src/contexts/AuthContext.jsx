@@ -93,8 +93,10 @@ export function AuthProvider({ children }) {
       const email = decoded.email;
       const name = decoded.name;
 
-      if (!email.endsWith('@usp.br')) {
-        throw new Error("Apenas e-mails institucionais (@usp.br) são permitidos.");
+      // if (!email.endsWith('@usp.br')) {
+      if (!email.endsWith('@gmail.com')) {
+        // throw new Error("Apenas e-mails institucionais (@usp.br) são permitidos.");
+        throw new Error("Apenas e-mails institucionais (@gmail.com) são permitidos.");
       }
 
       // Usando a mesma lógica de salt do seu useEffect

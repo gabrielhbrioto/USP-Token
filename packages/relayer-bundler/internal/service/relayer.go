@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"strings"
 	"os"
+	"log"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -113,7 +114,8 @@ func (s *RelayerService) RegisterStudent(ctx context.Context, tokenString string
 	email := emailItem.(string)
 
 	// Verificação de domínio
-	if !strings.HasSuffix(email, "@usp.br") {
+	// if !strings.HasSuffix(email, "@usp.br") { 
+	if !strings.HasSuffix(email, "@gmail.com") {
 		return "", fmt.Errorf("apenas emails da USP sao permitidos")
 	}
 
@@ -156,13 +158,14 @@ func getAssetPath(filename string) string {
 func (s *RelayerService) GenerateCertificateImage(req CertificateRequest) ([]byte, error) {
 	txtCfg := textConfig{
 		boldPath:    getAssetPath("Roboto-Bold.ttf"),
-		regularPath: getAssetPath("Roboto-Regular.ttf"),
+		// regularPath: getAssetPath("Roboto-Regular.ttf"),
 		mainColor:   "#2C3E50", 
 		dataColor:   "#333333", 
 	}
 
 	img, err := gg.LoadImage(getAssetPath("template-certificado.png")) // Certifique-se de que este é o template LIMPO
 	if err != nil {
+		log.Printf("ERRO INTERNO [GenerateCertificate]: %v\n", err)
 		return nil, fmt.Errorf("falha ao carregar o template: %v", err)
 	}
 
@@ -214,7 +217,7 @@ func (s *RelayerService) GenerateCertificateImage(req CertificateRequest) ([]byt
 
 	// --- 3. Assinaturas ---
 	ySignName := H * 0.78  // Logo acima da linha
-	ySignTitle := H * 0.87 // Abaixo do texto estático "Diretor/Coordenador"
+	// ySignTitle := H * 0.87 // Abaixo do texto estático "Diretor/Coordenador"
 
 	// Nomes (Bold)
 	dc.SetHexColor(txtCfg.mainColor)
@@ -225,8 +228,8 @@ func (s *RelayerService) GenerateCertificateImage(req CertificateRequest) ([]byt
 	// Cargos (Regular)
 	dc.SetHexColor(txtCfg.dataColor)
 	dc.LoadFontFace(txtCfg.regularPath, signatureTitleFontSize)
-	dc.DrawStringAnchored(req.DirectorTitle, W*0.25, ySignTitle, 0.5, 0.5)
-	dc.DrawStringAnchored(req.CoordinatorTitle, W*0.75, ySignTitle, 0.5, 0.5)
+	// dc.DrawStringAnchored(req.DirectorTitle, W*0.25, ySignTitle, 0.5, 0.5)
+	// dc.DrawStringAnchored(req.CoordinatorTitle, W*0.75, ySignTitle, 0.5, 0.5)
 
 	buf := new(bytes.Buffer)
 	if err := jpeg.Encode(buf, dc.Image(), &jpeg.Options{Quality: 95}); err != nil {

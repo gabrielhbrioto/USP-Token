@@ -2,6 +2,7 @@ package transport
 
 import (
 	"net/http"
+	"log"
 
 	"github.com/gabrielhbrioto/Usp-Token/packages/relayer-bundler/internal/service"
 	"github.com/gabrielhbrioto/Usp-Token/packages/relayer-bundler/pkg/contracts"
@@ -76,6 +77,7 @@ func SetupRouter(svc *service.RelayerService) *gin.Engine {
 		// Chama o serviço para gerar os bytes da imagem
 		imgBytes, err := svc.GenerateCertificateImage(req)
 		if err != nil {
+			log.Printf("ERRO INTERNO [GenerateCertificate]: %v\n", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

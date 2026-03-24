@@ -32,6 +32,9 @@ WORKDIR /app
 # Copia apenas o binário compilado do estágio 1 para este novo container
 COPY --from=builder /app/relayer-api .
 
+# Copia a pasta assets para dentro do contêiner
+COPY assets/ ./assets/ 
+
 # Exposição de porta (documentação para quem for ler o Dockerfile)
 EXPOSE 8080
 

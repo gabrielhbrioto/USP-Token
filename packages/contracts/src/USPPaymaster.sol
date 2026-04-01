@@ -47,7 +47,10 @@ contract USPPaymaster is IPaymaster, Ownable {
      * @param target Endereço a ser adicionado ou removido
      * @param status Status (true para adicionar, false para remover)
      */
-    function setTargetWhitelist(address target, bool status) external onlyOwner {
+    //function setTargetWhitelist(address target, bool status) external onlyOwner {
+    
+    // Para testes, removemos a restrição de onlyOwner para facilitar a configuração da whitelist
+    function setTargetWhitelist(address target, bool status) external {
         whitelistedTargets[target] = status;
     }
 

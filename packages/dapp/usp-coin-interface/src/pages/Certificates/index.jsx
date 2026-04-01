@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function Certificates() {
   // Estado para armazenar os dados do formulário
   // Preenchido com valores padrão para facilitar os testes
+  const { walletAddress: studentAddress } = useAuth(); 
+  
   const [formData, setFormData] = useState({
+    studentAddress: studentAddress,
     studentName: 'GABRIEL HENRIQUE BRIOTO',
     courseName: 'ENGENHARIA DE COMPUTAÇÃO WEB3',
     hours: '40',
@@ -24,6 +28,7 @@ export function Certificates() {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
   const [error, setError] = useState('');
+  const [txHash, setTxHash] = useState('');
 
   // Atualiza o estado conforme o usuário digita
   const handleChange = (e) => {
@@ -32,14 +37,16 @@ export function Certificates() {
   };
 
   // Função disparada ao submeter o formulário
+  // Função disparada ao submeter o formulário
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setTxHash(''); // Limpa o hash anterior
 
     try {
-      // Faz o POST para o Relayer em Go (ajuste a porta se o seu servidor rodar em outra)
-      const response = await fetch('http://localhost:8080/certificate/generate', {
+      // 1. Dispara a emissão oficial na Blockchain (IPFS + Mint via Relayer)
+      const issueResponse = await fetch('http://localhost:8080/certificate/issue', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -47,12 +54,30 @@ export function Certificates() {
         body: JSON.stringify(formData),
       });
 
-      if (!response.ok) {
-        throw new Error('Falha ao comunicar com o servidor para gerar o certificado.');
+      if (!issueResponse.ok) {
+        const errData = await issueResponse.json();
+        throw new Error(errData.error || 'Falha ao emitir o certificado na blockchain.');
       }
 
-      // Como o backend retorna a imagem diretamente (c.Data), pegamos o Blob
-      const imageBlob = await response.blob();
+      // Extrai o JSON com os dados do Mint
+      const issueData = await issueResponse.json();
+      setTxHash(issueData.txHash); // Salva o hash para mostrar na tela
+
+      // 2. Busca a imagem gerada em memória para exibição/download no navegador
+      const generateResponse = await fetch('http://localhost:8080/certificate/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!generateResponse.ok) {
+        throw new Error('Certificado emitido, mas falha ao carregar a visualização.');
+      }
+
+      // Como a rota /generate retorna a imagem diretamente, pegamos o Blob
+      const imageBlob = await generateResponse.blob();
       
       // Cria uma URL temporária no navegador para exibir a imagem gerada
       const imageUrl = URL.createObjectURL(imageBlob);
@@ -131,6 +156,19 @@ export function Certificates() {
 
           {/* LADO DIREITO: Preview da Imagem */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col items-center justify-center min-h-[400px]">
+            {txHash && (
+              <div className="w-full mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+                <p className="text-green-800 font-semibold mb-1">✅ NFT Emitido com Sucesso!</p>
+                <a 
+                  href={`https://sepolia.etherscan.io/tx/${txHash}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  Ver transação no Etherscan
+                </a>
+              </div>
+            )}
             {generatedImage ? (
               <div className="w-full flex flex-col items-center">
                 <h2 className="text-xl font-semibold mb-4 text-gray-700 self-start">Visualização</h2>

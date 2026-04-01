@@ -34,9 +34,14 @@ func main() {
 	if err != nil {
 		log.Fatal("Erro ao instanciar IdentityRegistry:", err)
 	}
+	certAddress := common.HexToAddress(cfg.CertificateAddr)
+	certContract, err := contracts.NewUSPCertificate(certAddress, client)
+	if err != nil {
+		log.Fatalf("Erro ao instanciar certificado: %v", err)
+	}
 
 	// Passamos o 'idReg' como o 4º parâmetro
-	svc := service.NewRelayerService(cfg, client, ep, idReg)
+	svc := service.NewRelayerService(cfg, client, ep, idReg, certContract)
 	r := transport.SetupRouter(svc)
 
 	log.Printf("Relayer rodando na porta %s", cfg.Port)

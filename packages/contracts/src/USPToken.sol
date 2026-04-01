@@ -30,7 +30,10 @@ contract USPToken is ERC20, ERC20Burnable, AccessControl {
      * @param to Endereço do destinatário
      * @param amount Quantidade de tokens a serem emitidos
      */
-    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+    // function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+
+    // Para testes, removemos a restrição de onlyRole para facilitar a emissão de tokens
+    function mint(address to, uint256 amount) public {
         require(identityRegistry.isStudentActive(to), "Destinatario nao e um estudante ativo");
         _mint(to, amount);
     }

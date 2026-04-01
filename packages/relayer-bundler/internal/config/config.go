@@ -12,9 +12,11 @@ type Config struct {
 	RpcUrl        string
 	PrivateKey    string
 	EntryPointAddr string
+	CertificateAddr string
 	Port          string
 	GoogleClientID       string
 	IdentityRegistryAddr string
+	PinataJWT		   string
 }
 
 func Load() (*Config, error) {
@@ -26,6 +28,8 @@ func Load() (*Config, error) {
 		"ENTRYPOINT_ADDRESS",
 		"GOOGLE_CLIENT_ID",
 		"IDENTITY_REGISTRY_ADDRESS",
+		"CERTIFICATE_ADDR",
+		"PINATA_JWT",
 	}
 
 	var missing []string
@@ -43,9 +47,11 @@ func Load() (*Config, error) {
 		RpcUrl:        os.Getenv("SEPOLIA_RPC_URL"),
 		PrivateKey:    os.Getenv("BUNDLER_PRIVATE_KEY"),
 		EntryPointAddr: os.Getenv("ENTRYPOINT_ADDRESS"),
+		CertificateAddr: os.Getenv("CERTIFICATE_ADDR"),
 		Port:          getEnv("PORT", "8080"),
 		GoogleClientID:       os.Getenv("GOOGLE_CLIENT_ID"),      
 		IdentityRegistryAddr: os.Getenv("IDENTITY_REGISTRY_ADDRESS"),
+		PinataJWT:		   os.Getenv("PINATA_JWT"),
 	}, nil
 }
 

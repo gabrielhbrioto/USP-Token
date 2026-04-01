@@ -6,22 +6,28 @@ import { formatUnits, parseUnits } from 'viem';
 import IdentityRegistryABI from '../../abi/IdentityRegistry.json';
 import USPTokenABI from '../../abi/USPToken.json'; 
 import StudentGovernanceABI from '../../abi/StudentGovernance.json';
-
+import { useAccount, useSwitchChain } from 'wagmi';
+import { sepolia } from 'wagmi/chains';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Variáveis de ambiente do Vite
 const IDENTITY_REGISTRY_ADDR = import.meta.env.VITE_IDENTITY_REGISTRY_ADDRESS;
 const USP_TOKEN_ADDR = import.meta.env.VITE_USP_TOKEN_ADDRESS;
 const GOVERNANCE_ADDR = import.meta.env.VITE_GOVERNANCE_ADDRESS;
 
-export function Wallet({ studentAddress }) {
+export function Wallet() {
+  const { walletAddress: studentAddress } = useAuth(); 
   const publicClient = usePublicClient();
   const [receiverAddress, setReceiverAddress] = useState('');
   const [transferAmount, setTransferAmount] = useState('');
   const [transferStatus, setTransferStatus] = useState('');
   const [readyProposals, setReadyProposals] = useState([]);
+  const { chainId, isConnected } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const isWrongNetwork = isConnected && chainId !== sepolia.id;
 
   // 1. Leitura em Lote (Status do Aluno, Saldo e Dados Globais da Governança)
-  const { data: onChainData, isLoading } = useReadContracts({
+  const { data: onChainData, isLoading, error: globalError } = useReadContracts({
     contracts: [
       {
         address: IDENTITY_REGISTRY_ADDR,
@@ -47,6 +53,15 @@ export function Wallet({ studentAddress }) {
       }
     ]
   });
+
+  useEffect(() => {
+    console.log("1. Endereços carregados do .env:", { 
+      registry: IDENTITY_REGISTRY_ADDR, 
+      token: USP_TOKEN_ADDR 
+    });
+    console.log("2. Status das chamadas do Wagmi:", onChainData);
+    if (globalError) console.error("3. Erro Global do Wagmi:", globalError);
+  }, [onChainData, globalError]);
 
   // O wagmi retorna os dados na mesma ordem do array de contratos
   const isActive = onChainData?.[0]?.result; // Retorna true se o estudante estiver ativo no IdentityRegistry [cite: 73]
@@ -76,9 +91,9 @@ export function Wallet({ studentAddress }) {
       setTransferStatus('Montando UserOperation...');
       
       // Lógica de integração com o Relayer em Go
-      // const callData = encodeFunctionData({ abi: USPTokenABI, functionName: 'transfer', args: [receiverAddress, parseUnits(transferAmount, 18)] });
-      // const userOp = await buildUserOp(studentAddress, USP_TOKEN_ADDR, callData);
-      // await fetch(import.meta.env.VITE_RELAYER_URL, { method: 'POST', body: JSON.stringify(userOp) });
+      const callData = encodeFunctionData({ abi: USPTokenABI, functionName: 'transfer', args: [receiverAddress, parseUnits(transferAmount, 18)] });
+      const userOp = await buildUserOp(studentAddress, USP_TOKEN_ADDR, callData);
+      await fetch(import.meta.env.VITE_RELAYER_URL, { method: 'POST', body: JSON.stringify(userOp) });
       
       setTransferStatus('UserOperation enviada ao relayer com sucesso!');
     } catch (error) {
@@ -132,6 +147,23 @@ export function Wallet({ studentAddress }) {
     if (activeStudentCount > 0n) checkProposals();
   }, [publicClient, activeStudentCount, quorumPercentage, studentAddress]);
 
+  if (isWrongNetwork) {
+    return (
+      <div className="max-w-4xl mx-auto p-6 bg-red-50 border border-red-200 text-center rounded-lg mt-8">
+        <h2 className="text-xl font-bold text-red-800 mb-2">Rede Incorreta detectada</h2>
+        <p className="text-red-600 mb-4">
+          O dApp do USPToken funciona exclusivamente na rede Sepolia. 
+          Por favor, altere a rede na sua carteira.
+        </p>
+        <button 
+          onClick={() => switchChain({ chainId: sepolia.id })}
+          className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Trocar para Sepolia
+        </button>
+      </div>
+    );
+  }
 
   if (isLoading) return <div className="p-8 text-center text-gray-600">Carregando carteira USP...</div>;
 

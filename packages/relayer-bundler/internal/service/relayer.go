@@ -3,13 +3,15 @@ package service
 import (
 	"bytes"
 	"context"
-	// "encoding/json"
+	"encoding/json"
 	"fmt"
 	"image/jpeg"
 	"math/big"
 	"strings"
 	"os"
 	"log"
+	"mime/multipart"
+	"net/http"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -21,7 +23,26 @@ import (
 	"google.golang.org/api/idtoken"
 )
 
+// --- Structs do Padrão NFT e Pinata ---
+
+type PinataResponse struct {
+	IpfsHash string `json:"IpfsHash"`
+}
+
+type NFTAttribute struct {
+	TraitType string `json:"trait_type"`
+	Value     string `json:"value"`
+}
+
+type NFTMetadata struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Image       string         `json:"image"`
+	Attributes  []NFTAttribute `json:"attributes"`
+}
+
 type CertificateRequest struct {
+	StudentAddress     string `json:"studentAddress"`
 	StudentName        string `json:"studentName"`
 	CourseName         string `json:"courseName"`
 	Hours              string `json:"hours"`
@@ -58,21 +79,27 @@ type IdentityRegistryContract interface {
 	AddStudent(opts *bind.TransactOpts, studentAddress common.Address, studentId string) (*types.Transaction, error)
 }
 
+type CertificateContract interface {
+	SystemMintCertificate(opts *bind.TransactOpts, student common.Address, metadataURI string) (*types.Transaction, error)
+}
+
 // 2. A struct agora depende das interfaces, não das implementações concretas
 type RelayerService struct {
 	client     ChainClient
 	cfg        *config.Config
 	entryPoint EntryPointContract
 	identityRegistry   IdentityRegistryContract
+	certificateContract CertificateContract
 }
 
 // 3. O construtor recebe as dependências prontas
-func NewRelayerService(cfg *config.Config, client ChainClient, ep EntryPointContract, idReg IdentityRegistryContract) *RelayerService {
+func NewRelayerService(cfg *config.Config, client ChainClient, ep EntryPointContract, idReg IdentityRegistryContract, certContract CertificateContract) *RelayerService {
 	return &RelayerService{
 		client:     client,
 		cfg:        cfg,
 		entryPoint: ep,
 		identityRegistry: idReg,
+		certificateContract: certContract,
 	}
 }
 
@@ -237,4 +264,140 @@ func (s *RelayerService) GenerateCertificateImage(req CertificateRequest) ([]byt
 	}
 
 	return buf.Bytes(), nil
+}
+
+// --- Funções de Upload para o IPFS ---
+
+// uploadFileToPinata envia o buffer JPEG gerado para o IPFS
+func (s *RelayerService) uploadFileToPinata(fileBytes []byte, filename string) (string, error) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return "", err
+	}
+	part.Write(fileBytes)
+	writer.Close()
+
+	req, err := http.NewRequest("POST", "https://api.pinata.cloud/pinning/pinFileToIPFS", body)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+s.cfg.PinataJWT)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("erro do pinata file: %s", resp.Status)
+	}
+
+	var pinataResp PinataResponse
+	json.NewDecoder(resp.Body).Decode(&pinataResp)
+
+	return "ipfs://" + pinataResp.IpfsHash, nil
+}
+
+// uploadJSONToPinata envia os metadados do certificado para o IPFS
+func (s *RelayerService) uploadJSONToPinata(metadata NFTMetadata) (string, error) {
+	jsonData, err := json.Marshal(metadata)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("POST", "https://api.pinata.cloud/pinning/pinJSONToIPFS", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+s.cfg.PinataJWT)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("erro do pinata json: %s", resp.Status)
+	}
+
+	var pinataResp PinataResponse
+	json.NewDecoder(resp.Body).Decode(&pinataResp)
+
+	return "ipfs://" + pinataResp.IpfsHash, nil
+}
+
+// --- Orquestrador Final ---
+
+// GenerateAndPinCertificate gera a imagem, sobe pro IPFS, cria o JSON, sobe pro IPFS e retorna o URI final
+func (s *RelayerService) GenerateAndPinCertificate(req CertificateRequest) (string, error) {
+	// 1. Gera a imagem em memória (função que já criamos e validamos)
+	imgBytes, err := s.GenerateCertificateImage(req)
+	if err != nil {
+		return "", fmt.Errorf("falha ao gerar imagem: %v", err)
+	}
+
+	// 2. Faz o upload da imagem para o IPFS
+	imageURI, err := s.uploadFileToPinata(imgBytes, "certificado_"+strings.ReplaceAll(req.StudentName, " ", "_")+".jpg")
+	if err != nil {
+		return "", fmt.Errorf("falha no upload da imagem: %v", err)
+	}
+
+	// 3. Monta o JSON padrão ERC-721
+	metadata := NFTMetadata{
+		Name:        "Certificado USP - " + req.StudentName,
+		Description: "Certificado Soulbound de conclusão do curso de " + req.CourseName + " no ecossistema USP.",
+		Image:       imageURI, // <-- Aqui vai o link ipfs://Qm... da imagem gerada!
+		Attributes: []NFTAttribute{
+			{TraitType: "Curso", Value: req.CourseName},
+			{TraitType: "Carga Horária", Value: req.Hours + "h"},
+			{TraitType: "Nota", Value: req.GradePercent},
+			{TraitType: "Data de Emissão", Value: fmt.Sprintf("%s/%s/%s", req.EmissionDay, req.EmissionMonth, req.EmissionYear)},
+		},
+	}
+
+	// 4. Faz o upload do JSON para o IPFS
+	metadataURI, err := s.uploadJSONToPinata(metadata)
+	if err != nil {
+		return "", fmt.Errorf("falha no upload dos metadados: %v", err)
+	}
+
+	// 5. Retorna o metadataURI final!
+	return metadataURI, nil
+}
+
+// IssueCertificateOnChain assina e envia a transação de Mint do NFT
+func (s *RelayerService) IssueCertificateOnChain(ctx context.Context, studentAddressHex string, metadataURI string) (string, error) {
+	privateKey, err := crypto.HexToECDSA(s.cfg.PrivateKey)
+	if err != nil {
+		return "", fmt.Errorf("chave privada invalida: %v", err)
+	}
+
+	chainId, err := s.client.ChainID(ctx)
+	if err != nil {
+		return "", fmt.Errorf("falha ao obter chainID: %v", err)
+	}
+
+	auth, _ := bind.NewKeyedTransactorWithChainID(privateKey, chainId)
+	
+	studentAddress := common.HexToAddress(studentAddressHex)
+
+	// AQUI: Assumindo que você adicionou o certificado no RelayerService (como fez com IdentityRegistry)
+	// Chamamos a nova função systemMintCertificate do Smart Contract
+	tx, err := s.certificateContract.SystemMintCertificate(auth, studentAddress, metadataURI)
+	if err != nil {
+		return "", fmt.Errorf("falha ao emitir NFT na blockchain: %v", err)
+	}
+
+	return tx.Hash().Hex(), nil
 }

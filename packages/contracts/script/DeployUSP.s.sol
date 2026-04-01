@@ -18,7 +18,7 @@ contract DeployUSP is Script {
     // Endereço oficial do EntryPoint na Sepolia (v0.6)
     // Verifique se seus contratos usam v0.6 ou v0.7. O endereço abaixo é o padrão para v0.6.
     // Se for v0.7, use 0x0000000071727De22E5E9d8BAf0edAc6f37da032
-    address constant ENTRYPOINT_ADDR = 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789;
+    address constant ENTRYPOINT_ADDR = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
 
     /**
      * @dev Função principal que executa o script de deploy.

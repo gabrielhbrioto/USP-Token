@@ -45,6 +45,20 @@ contract USPCertificate is ERC721, ERC721URIStorage, AccessControl, IERC5192 {
     }
 
     /**
+     * @dev Função para o sistema (Relayer) emitir o certificado diretamente para o aluno.
+     * @param student Endereço do aluno que receberá o NFT
+     * @param metadataURI URI do IPFS com os dados do certificado
+     */
+    function systemMintCertificate(address student, string memory metadataURI) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(identityRegistry.isStudentActive(student), "Apenas alunos ativos podem receber");
+        
+        uint256 tokenId = _nextTokenId++;
+        _safeMint(student, tokenId);
+        _setTokenURI(tokenId, metadataURI);
+        emit Locked(tokenId);
+    }
+
+    /**
      * @dev Altera o custo do certificado.
      * @param newCost Novo custo do certificado em SocialCurrency
      */

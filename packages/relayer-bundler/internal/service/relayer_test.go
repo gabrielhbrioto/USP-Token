@@ -40,6 +40,22 @@ func (m *MockEntryPoint) HandleOps(opts *bind.TransactOpts, ops []contracts.User
 	return fakeTx, nil
 }
 
+// Simulando o Contrato IdentityRegistry
+type MockIdentityRegistry struct{}
+
+// AddStudent implements [IdentityRegistryContract].
+func (m *MockIdentityRegistry) AddStudent(opts *bind.TransactOpts, studentAddress common.Address, studentId string) (*types.Transaction, error) {
+	panic("unimplemented")
+}
+
+// Simulando o Contrato Certificate
+type MockCertificate struct{}
+
+// SystemMintCertificate implements [CertificateContract].
+func (m *MockCertificate) SystemMintCertificate(opts *bind.TransactOpts, student common.Address, metadataURI string) (*types.Transaction, error) {
+	panic("unimplemented")
+}
+
 // --- TESTES DE BLOCKCHAIN ---
 
 func TestSendBundle_Success(t *testing.T) {
@@ -49,7 +65,7 @@ func TestSendBundle_Success(t *testing.T) {
 	}
 
 	// 2. Injeta os Mocks no serviço
-	svc := NewRelayerService(cfg, &MockChainClient{}, &MockEntryPoint{}, nil)
+	svc := NewRelayerService(cfg, &MockChainClient{}, &MockEntryPoint{}, &MockIdentityRegistry{}, &MockCertificate{})
 
 	// 3. Cria uma UserOperation vazia (irrelevante para este teste de infra)
 	mockOp := contracts.UserOperation{}
@@ -82,11 +98,11 @@ func (m *MockEntryPointError) HandleOps(opts *bind.TransactOpts, ops []contracts
 func TestSendBundle_Failure_ContractRevert(t *testing.T) {
 	// 1. Prepara a configuração com uma chave válida para não falhar na etapa de criptografia
 	cfg := &config.Config{
-		PrivateKey: "fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19", 
+		PrivateKey: "fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19",
 	}
 
 	// 2. Injeta o Mock de SUCESSO para o Client, mas o Mock de ERRO para o EntryPoint
-	svc := NewRelayerService(cfg, &MockChainClient{}, &MockEntryPointError{}, nil)
+	svc := NewRelayerService(cfg, &MockChainClient{}, &MockEntryPointError{}, &MockIdentityRegistry{}, &MockCertificate{})
 
 	// 3. Cria a UserOperation
 	mockOp := contracts.UserOperation{}
@@ -123,20 +139,20 @@ func TestGenerateCertificateImage(t *testing.T) {
 
 	// Preenche uma requisição completa com dados de teste
 	req := CertificateRequest{
-		StudentName:        "GABRIEL HENRIQUE BRIOTO", // Caps para bold ficar mais visível
-		CourseName:         "ENGENHARIA DE COMPUTAÇÃO WEB3", // Caps para bold
-		Hours:              "40",
-		StartDate:          "17/03/2026",
-		EndDate:            "17/04/2026",
-		GradePercent:       "95",
-		DirectorName:       "Prof. Dr. Fulano de Tal",
-		DirectorTitle:      "Diretor da Poli-USP",
-		CoordinatorName:    "Ciclana de Souza",
-		CoordinatorTitle:   "Coordenadora do Curso",
-		EmissionDay:        "17",
-		EmissionMonth:      "03",
-		EmissionYear:       "2026",
-		VerificationCode:   "USP-12345678",
+		StudentName:      "GABRIEL HENRIQUE BRIOTO",       // Caps para bold ficar mais visível
+		CourseName:       "ENGENHARIA DE COMPUTAÇÃO WEB3", // Caps para bold
+		Hours:            "40",
+		StartDate:        "17/03/2026",
+		EndDate:          "17/04/2026",
+		GradePercent:     "95",
+		DirectorName:     "Prof. Dr. Fulano de Tal",
+		DirectorTitle:    "Diretor da Poli-USP",
+		CoordinatorName:  "Ciclana de Souza",
+		CoordinatorTitle: "Coordenadora do Curso",
+		EmissionDay:      "17",
+		EmissionMonth:    "03",
+		EmissionYear:     "2026",
+		VerificationCode: "USP-12345678",
 	}
 
 	// 2. Execução

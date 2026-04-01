@@ -47,7 +47,7 @@ forge script script/DeployUSP.s.sol \
     --broadcast \
     --verify \
     --slow \
-    -vvvv 
+    -vvvv > deploy-new.log 2>&1
 ```
 
 **Explicação das Flags:**

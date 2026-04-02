@@ -5,8 +5,8 @@ import { sepolia } from 'viem/chains';
 // 1. CONFIGURAÇÕES
 const RPC_URL = 'https://sepolia.infura.io/v3/bd7646012a6547b4b8f5aed540422dd1';
 const MNEMONIC = 'monkey fat require arctic grit blouse steak planet hurry betray mechanic tool';
-const PAYMASTER_ADDRESS = '0xc1E42816B1CDF6977692C6eb4dF18f440a57D77F';
-const USP_TOKEN_ADDRESS = '0x56412963Afd3db0C27929A71Ef9cbbfbE3D2cf63';
+const PAYMASTER_ADDRESS = '0x9Cc353b961f5D229f4954d1eb65ddb84422Fbe2f';
+const USP_TOKEN_ADDRESS = '0x143c3FdA8Cb3B9fB31c3a6A3faBa08938ab7de48';
 
 const PaymasterABI = [
   { "inputs": [], "name": "makeDeposit", "outputs": [], "stateMutability": "payable", "type": "function" },

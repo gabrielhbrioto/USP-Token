@@ -39,6 +39,15 @@ contract USPToken is ERC20, ERC20Burnable, AccessControl {
     }
 
     /**
+     * @dev Queima tokens de um aluno específico pelo sistema (sem precisar de allowance).
+     * @param from Endereço do aluno
+     * @param amount Quantidade a ser queimada
+     */
+    function systemBurn(address from, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _burn(from, amount);
+    }
+
+    /**
      * @dev Sobrescreve a função de transferência para incluir validação de status dos estudantes.
      * @param from Endereço do remetente
      * @param to Endereço do destinatário

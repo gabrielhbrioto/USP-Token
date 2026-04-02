@@ -14,7 +14,10 @@ import "./IIdentityRegistry.sol";
 
 // Interfaces para integração com outros contratos
 interface IERC5192 { function locked(uint256 tokenId) external view returns (bool); }
-interface ISocialCurrency { function burnFrom(address account, uint256 amount) external; }
+interface ISocialCurrency { 
+    function burnFrom(address account, uint256 amount) external; 
+    function systemBurn(address account, uint256 amount) external; // <-- ADICIONE ESTA LINHA
+}
 
 contract USPCertificate is ERC721, ERC721URIStorage, AccessControl, IERC5192 {
 
@@ -45,13 +48,16 @@ contract USPCertificate is ERC721, ERC721URIStorage, AccessControl, IERC5192 {
     }
 
     /**
-     * @dev Função para o sistema (Relayer) emitir o certificado diretamente para o aluno.
+     * @dev Função para o sistema emitir o certificado diretamente para o aluno e cobrar o custo.
      * @param student Endereço do aluno que receberá o NFT
      * @param metadataURI URI do IPFS com os dados do certificado
      */
     function systemMintCertificate(address student, string memory metadataURI) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(identityRegistry.isStudentActive(student), "Apenas alunos ativos podem receber");
-        
+
+        // O sistema arranca os tokens do aluno sem precisar de "approve"
+        socialCurrency.systemBurn(student, certificateCost);
+
         uint256 tokenId = _nextTokenId++;
         _safeMint(student, tokenId);
         _setTokenURI(tokenId, metadataURI);

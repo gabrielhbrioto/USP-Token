@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 
+
 export function Certificates() {
-  // Estado para armazenar os dados do formulário
-  // Preenchido com valores padrão para facilitar os testes
   const { walletAddress: studentAddress } = useAuth(); 
   
   const [formData, setFormData] = useState({
@@ -46,7 +45,7 @@ export function Certificates() {
 
     try {
       // 1. Dispara a emissão oficial na Blockchain (IPFS + Mint via Relayer)
-      const issueResponse = await fetch('http://localhost:8080/certificate/issue', {
+      const issueResponse = await fetch(`${import.meta.env.VITE_RELAYER_URL}/certificate/issue`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,7 +63,7 @@ export function Certificates() {
       setTxHash(issueData.txHash); // Salva o hash para mostrar na tela
 
       // 2. Busca a imagem gerada em memória para exibição/download no navegador
-      const generateResponse = await fetch('http://localhost:8080/certificate/generate', {
+      const generateResponse = await fetch(`${import.meta.env.VITE_RELAYER_URL}/certificate/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -93,6 +93,9 @@ contract DeployUSP is Script {
         cert.grantRole(cert.GOVERNANCE_ROLE(), address(governance));
         console.log("- Governance agora tem GOVERNANCE_ROLE no Certificado");
 
+        // C) Conceder papel de administrador do certificado para a governança (para permitir systemMintCertificate)
+        token.grantRole(token.DEFAULT_ADMIN_ROLE(), address(cert));
+
         // C) Transferir propriedade do Paymaster para a Governança
         // (Isso permite que a DAO altere limites de gás e whitelist)
         paymaster.transferOwnership(address(governance));

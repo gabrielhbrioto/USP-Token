@@ -4,7 +4,7 @@ import { sepolia } from 'viem/chains';
 
 const RPC_URL = 'https://sepolia.infura.io/v3/bd7646012a6547b4b8f5aed540422dd1';
 const MNEMONIC = 'monkey fat require arctic grit blouse steak planet hurry betray mechanic tool';
-const USP_TOKEN_ADDRESS = '0x56412963Afd3db0C27929A71Ef9cbbfbE3D2cf63';
+const USP_TOKEN_ADDRESS = '0x143c3FdA8Cb3B9fB31c3a6A3faBa08938ab7de48';
 const targetStudentAddress = '0x6A19f2C4ab35827F38b8eE796Bb18dC0DDba6240';
 
 async function main() {

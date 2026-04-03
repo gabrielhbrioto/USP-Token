@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image/jpeg"
-	"math/big"
-	"strings"
-	"os"
 	"log"
+	"math/big"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -42,21 +43,21 @@ type NFTMetadata struct {
 }
 
 type CertificateRequest struct {
-	StudentAddress     string `json:"studentAddress"`
-	StudentName        string `json:"studentName"`
-	CourseName         string `json:"courseName"`
-	Hours              string `json:"hours"`
-	StartDate          string `json:"startDate"`
-	EndDate            string `json:"endDate"`
-	GradePercent       string `json:"gradePercent"`
-	DirectorName       string `json:"directorName"`
-	DirectorTitle      string `json:"directorTitle"`
-	CoordinatorName    string `json:"coordinatorName"`
-	CoordinatorTitle   string `json:"coordinatorTitle"`
-	EmissionDay        string `json:"emissionDay"`
-	EmissionMonth      string `json:"emissionMonth"`
-	EmissionYear       string `json:"emissionYear"`
-	VerificationCode   string `json:"verificationCode"`
+	StudentAddress   string `json:"studentAddress"`
+	StudentName      string `json:"studentName"`
+	CourseName       string `json:"courseName"`
+	Hours            string `json:"hours"`
+	StartDate        string `json:"startDate"`
+	EndDate          string `json:"endDate"`
+	GradePercent     string `json:"gradePercent"`
+	DirectorName     string `json:"directorName"`
+	DirectorTitle    string `json:"directorTitle"`
+	CoordinatorName  string `json:"coordinatorName"`
+	CoordinatorTitle string `json:"coordinatorTitle"`
+	EmissionDay      string `json:"emissionDay"`
+	EmissionMonth    string `json:"emissionMonth"`
+	EmissionYear     string `json:"emissionYear"`
+	VerificationCode string `json:"verificationCode"`
 }
 
 type textConfig struct {
@@ -85,42 +86,83 @@ type CertificateContract interface {
 
 // 2. A struct agora depende das interfaces, não das implementações concretas
 type RelayerService struct {
-	client     ChainClient
-	cfg        *config.Config
-	entryPoint EntryPointContract
-	identityRegistry   IdentityRegistryContract
+	client              ChainClient
+	cfg                 *config.Config
+	entryPoint          EntryPointContract
+	identityRegistry    IdentityRegistryContract
 	certificateContract CertificateContract
 }
 
 // 3. O construtor recebe as dependências prontas
 func NewRelayerService(cfg *config.Config, client ChainClient, ep EntryPointContract, idReg IdentityRegistryContract, certContract CertificateContract) *RelayerService {
 	return &RelayerService{
-		client:     client,
-		cfg:        cfg,
-		entryPoint: ep,
-		identityRegistry: idReg,
+		client:              client,
+		cfg:                 cfg,
+		entryPoint:          ep,
+		identityRegistry:    idReg,
 		certificateContract: certContract,
+	}
+}
+
+func bigIntString(v *big.Int) string {
+	if v == nil {
+		return "<nil>"
+	}
+	return v.String()
+}
+
+func logErrorChain(prefix string, err error) {
+	if err == nil {
+		return
+	}
+
+	log.Printf("%s: %v", prefix, err)
+	for depth, cause := 1, errors.Unwrap(err); cause != nil; depth, cause = depth+1, errors.Unwrap(cause) {
+		log.Printf("%s cause[%d]: %v", prefix, depth, cause)
 	}
 }
 
 func (s *RelayerService) SendBundle(userOp contracts.UserOperation) (string, error) {
 	privateKey, err := crypto.HexToECDSA(s.cfg.PrivateKey)
 	if err != nil {
-		return "", fmt.Errorf("chave privada invalida: %v", err)
+		wrappedErr := fmt.Errorf("chave privada invalida: %w", err)
+		logErrorChain("SendBundle: falha ao carregar chave privada", wrappedErr)
+		return "", wrappedErr
 	}
 
 	chainId, err := s.client.ChainID(context.Background())
 	if err != nil {
-		return "", fmt.Errorf("falha ao obter chainID: %v", err)
+		wrappedErr := fmt.Errorf("falha ao obter chainID: %w", err)
+		logErrorChain("SendBundle: falha ao obter chainID", wrappedErr)
+		return "", wrappedErr
 	}
 
-	auth, _ := bind.NewKeyedTransactorWithChainID(privateKey, chainId)
+	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainId)
+	if err != nil {
+		wrappedErr := fmt.Errorf("falha ao criar transactor com chainID %s: %w", chainId.String(), err)
+		logErrorChain("SendBundle: falha ao criar transactor", wrappedErr)
+		return "", wrappedErr
+	}
+
 	ops := []contracts.UserOperation{userOp}
 	bundlerAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
 
 	tx, err := s.entryPoint.HandleOps(auth, ops, bundlerAddress)
 	if err != nil {
-		return "", fmt.Errorf("falha ao enviar bundle: %v", err)
+		wrappedErr := fmt.Errorf("falha ao enviar bundle: %w", err)
+		logErrorChain(
+			fmt.Sprintf(
+				"SendBundle: HandleOps falhou sender=%s nonce=%s chainID=%s callDataLen=%d paymasterDataLen=%d bundler=%s",
+				userOp.Sender.Hex(),
+				bigIntString(userOp.Nonce),
+				chainId.String(),
+				len(userOp.CallData),
+				len(userOp.PaymasterAndData),
+				bundlerAddress.Hex(),
+			),
+			wrappedErr,
+		)
+		return "", wrappedErr
 	}
 
 	return tx.Hash().Hex(), nil
@@ -130,7 +172,9 @@ func (s *RelayerService) RegisterStudent(ctx context.Context, tokenString string
 	// Valida o Token JWT com os servidores do Google
 	payload, err := idtoken.Validate(ctx, tokenString, s.cfg.GoogleClientID)
 	if err != nil {
-		return "", fmt.Errorf("token do google invalido: %v", err)
+		wrappedErr := fmt.Errorf("token do google invalido: %w", err)
+		logErrorChain("RegisterStudent: validacao de token falhou", wrappedErr)
+		return "", wrappedErr
 	}
 
 	// Extrai o email do payload
@@ -141,7 +185,7 @@ func (s *RelayerService) RegisterStudent(ctx context.Context, tokenString string
 	email := emailItem.(string)
 
 	// Verificação de domínio
-	// if !strings.HasSuffix(email, "@usp.br") { 
+	// if !strings.HasSuffix(email, "@usp.br") {
 	if !strings.HasSuffix(email, "@gmail.com") {
 		return "", fmt.Errorf("apenas emails da USP sao permitidos")
 	}
@@ -149,22 +193,36 @@ func (s *RelayerService) RegisterStudent(ctx context.Context, tokenString string
 	// Prepara a transação para a Blockchain
 	privateKey, err := crypto.HexToECDSA(s.cfg.PrivateKey)
 	if err != nil {
-		return "", fmt.Errorf("chave privada invalida: %v", err)
+		wrappedErr := fmt.Errorf("chave privada invalida: %w", err)
+		logErrorChain("RegisterStudent: falha ao carregar chave privada", wrappedErr)
+		return "", wrappedErr
 	}
 
 	chainId, err := s.client.ChainID(ctx)
 	if err != nil {
-		return "", fmt.Errorf("falha ao obter chainID: %v", err)
+		wrappedErr := fmt.Errorf("falha ao obter chainID: %w", err)
+		logErrorChain("RegisterStudent: falha ao obter chainID", wrappedErr)
+		return "", wrappedErr
 	}
 
-	auth, _ := bind.NewKeyedTransactorWithChainID(privateKey, chainId)
-	
+	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainId)
+	if err != nil {
+		wrappedErr := fmt.Errorf("falha ao criar transactor com chainID %s: %w", chainId.String(), err)
+		logErrorChain("RegisterStudent: falha ao criar transactor", wrappedErr)
+		return "", wrappedErr
+	}
+
 	// Como o contrato já foi injetado, basta usá-lo!
 	studentAddress := common.HexToAddress(studentAddressHex)
-	
+
 	tx, err := s.identityRegistry.AddStudent(auth, studentAddress, email)
-	if err != nil { 
-		return "", fmt.Errorf("falha ao registrar aluno na blockchain: %v", err) 
+	if err != nil {
+		wrappedErr := fmt.Errorf("falha ao registrar aluno na blockchain: %w", err)
+		logErrorChain(
+			fmt.Sprintf("RegisterStudent: AddStudent falhou student=%s email=%s chainID=%s", studentAddress.Hex(), email, chainId.String()),
+			wrappedErr,
+		)
+		return "", wrappedErr
 	}
 
 	return tx.Hash().Hex(), nil
@@ -184,10 +242,10 @@ func getAssetPath(filename string) string {
 
 func (s *RelayerService) GenerateCertificateImage(req CertificateRequest) ([]byte, error) {
 	txtCfg := textConfig{
-		boldPath:    getAssetPath("Roboto-Bold.ttf"),
+		boldPath: getAssetPath("Roboto-Bold.ttf"),
 		// regularPath: getAssetPath("Roboto-Regular.ttf"),
-		mainColor:   "#2C3E50", 
-		dataColor:   "#333333", 
+		mainColor: "#2C3E50",
+		dataColor: "#333333",
 	}
 
 	img, err := gg.LoadImage(getAssetPath("template-certificado.png")) // Certifique-se de que este é o template LIMPO
@@ -243,7 +301,7 @@ func (s *RelayerService) GenerateCertificateImage(req CertificateRequest) ([]byt
 	dc.DrawStringAnchored(req.VerificationCode, W*0.60, yVerify, 0.5, 0.5)
 
 	// --- 3. Assinaturas ---
-	ySignName := H * 0.78  // Logo acima da linha
+	ySignName := H * 0.78 // Logo acima da linha
 	// ySignTitle := H * 0.87 // Abaixo do texto estático "Diretor/Coordenador"
 
 	// Nomes (Bold)
@@ -380,23 +438,37 @@ func (s *RelayerService) GenerateAndPinCertificate(req CertificateRequest) (stri
 func (s *RelayerService) IssueCertificateOnChain(ctx context.Context, studentAddressHex string, metadataURI string) (string, error) {
 	privateKey, err := crypto.HexToECDSA(s.cfg.PrivateKey)
 	if err != nil {
-		return "", fmt.Errorf("chave privada invalida: %v", err)
+		wrappedErr := fmt.Errorf("chave privada invalida: %w", err)
+		logErrorChain("IssueCertificateOnChain: falha ao carregar chave privada", wrappedErr)
+		return "", wrappedErr
 	}
 
 	chainId, err := s.client.ChainID(ctx)
 	if err != nil {
-		return "", fmt.Errorf("falha ao obter chainID: %v", err)
+		wrappedErr := fmt.Errorf("falha ao obter chainID: %w", err)
+		logErrorChain("IssueCertificateOnChain: falha ao obter chainID", wrappedErr)
+		return "", wrappedErr
 	}
 
-	auth, _ := bind.NewKeyedTransactorWithChainID(privateKey, chainId)
-	
+	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainId)
+	if err != nil {
+		wrappedErr := fmt.Errorf("falha ao criar transactor com chainID %s: %w", chainId.String(), err)
+		logErrorChain("IssueCertificateOnChain: falha ao criar transactor", wrappedErr)
+		return "", wrappedErr
+	}
+
 	studentAddress := common.HexToAddress(studentAddressHex)
 
 	// AQUI: Assumindo que você adicionou o certificado no RelayerService (como fez com IdentityRegistry)
 	// Chamamos a nova função systemMintCertificate do Smart Contract
 	tx, err := s.certificateContract.SystemMintCertificate(auth, studentAddress, metadataURI)
 	if err != nil {
-		return "", fmt.Errorf("falha ao emitir NFT na blockchain: %v", err)
+		wrappedErr := fmt.Errorf("falha ao emitir NFT na blockchain: %w", err)
+		logErrorChain(
+			fmt.Sprintf("IssueCertificateOnChain: mint falhou student=%s chainID=%s metadataURI=%s", studentAddress.Hex(), chainId.String(), metadataURI),
+			wrappedErr,
+		)
+		return "", wrappedErr
 	}
 
 	return tx.Hash().Hex(), nil

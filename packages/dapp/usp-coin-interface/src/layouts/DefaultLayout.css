@@ -53,6 +53,13 @@
   transition: all 0.2s ease;
 }
 
+.usp-nav-button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
 .usp-nav-link:hover {
   color: var(--usp-link-hover);
 }

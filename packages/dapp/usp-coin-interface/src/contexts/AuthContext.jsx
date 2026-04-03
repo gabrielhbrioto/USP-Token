@@ -4,13 +4,14 @@ import { ethers } from 'ethers';
 import IdentityRegistryABI from '../abi/IdentityRegistry.json';
 import { useGoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from "jwt-decode";
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
 const AuthContext = createContext({});
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [walletAddress, setWalletAddress] = useState(null);
-
+  const [privateKey, setPrivateKey] = useState(null);
   const [signer, setSigner] = useState(null);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -99,7 +100,7 @@ export function AuthProvider({ children }) {
         throw new Error("Apenas e-mails institucionais (@gmail.com) são permitidos.");
       }
 
-      // Usando a mesma lógica de salt do seu useEffect
+      // Geração determinística da carteira (Excelente para o protótipo!)
       const salt = import.meta.env.VITE_SALT || "usp-token-secret-salt-2026";
       const privateKeyHash = ethers.id(`${salt}-${email}`);
       const wallet = new ethers.Wallet(privateKeyHash);
@@ -116,7 +117,7 @@ export function AuthProvider({ children }) {
           const rpcProvider = new ethers.JsonRpcProvider(rpcUrl);
           const identityContract = new ethers.Contract(
             contractAddress,
-            IdentityRegistryABI,
+            IdentityRegistryABI, // Certifique-se de que o ABI está importado neste arquivo
             rpcProvider
           );
           // Consulta gratuita para ver se a carteira já existe no contrato
@@ -160,9 +161,14 @@ export function AuthProvider({ children }) {
       // 3. ATUALIZA ESTADO E REDIRECIONA
       // =======================================================
       const userData = { name, email, address: wallet.address, isRegistered: true };
+      
       setUser(userData);
       setWalletAddress(wallet.address);
       setSigner(wallet);
+      
+      // 🚨 A SOLUÇÃO DO ERRO ESTÁ AQUI: Salva a chave privada no estado do contexto
+      setPrivateKey(wallet.privateKey); 
+      
       localStorage.setItem('@USPToken:user', JSON.stringify(userData));
       
       // Redireciona para o Dashboard (que renderiza a sua Wallet)
@@ -179,17 +185,24 @@ export function AuthProvider({ children }) {
   const logout = () => {
     setUser(null);
     setWalletAddress(null);
-    localStorage.removeItem('@USPToken:user');
-    navigate('/');
+    setPrivateKey(null);
+    setSigner(null);
+
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('@USPToken:'))
+      .forEach((key) => localStorage.removeItem(key));
+
+    navigate('/', { replace: true, state: { loggedOut: true } });
   };
 
   return (
     <AuthContext.Provider value={{ 
       user, 
       walletAddress, 
+      privateKey,
       signer, 
       isLoading, 
-      handleLoginSuccess, // <-- Adicione este
+      handleLoginSuccess, 
       logout 
     }}>
       {children}

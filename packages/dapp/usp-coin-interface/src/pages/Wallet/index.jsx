@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useReadContracts, usePublicClient, useSignMessage } from 'wagmi';
+import { Alert, Snackbar } from '@mui/material';
+import { useReadContracts, usePublicClient } from 'wagmi';
 import { formatUnits, parseUnits, encodeFunctionData, keccak256, encodeAbiParameters, parseAbiParameters } from 'viem';
 
 // Importação dos ABIs (assumindo que foram compilados para JSON)
@@ -27,6 +28,11 @@ export function Wallet() {
   const { switchChain } = useSwitchChain();
   const isWrongNetwork = isConnected && chainId !== sepolia.id;
   const [transferTxHash, setTransferTxHash] = useState('');
+  const [copySnackbar, setCopySnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   const ENTRY_POINT_ADDRESS = '0x0000000071727De22E5E9d8BAf0edAc6f37da032'; // Padrão ERC-4337 v0.6
   const CHAIN_ID = 11155111; // ID da Sepolia
@@ -130,6 +136,30 @@ export function Wallet() {
       paymasterAndData: "0x", // O seu Relayer em Go vai preencher isso antes de enviar pra rede!
       signature: "0x" // ⚠️ Atenção: O aluno precisará assinar o Hash dessa UserOp.
     };
+  };
+
+  const handleCopyAddress = async () => {
+    if (!studentAddress) return;
+
+    try {
+      await navigator.clipboard.writeText(studentAddress);
+      setCopySnackbar({
+        open: true,
+        message: 'Endereço copiado para a area de transferencia.',
+        severity: 'success',
+      });
+    } catch {
+      setCopySnackbar({
+        open: true,
+        message: 'Nao foi possivel copiar o endereco automaticamente.',
+        severity: 'error',
+      });
+    }
+  };
+
+  const handleCloseSnackbar = (_, reason) => {
+    if (reason === 'clickaway') return;
+    setCopySnackbar((prev) => ({ ...prev, open: false }));
   };
 
   // 2. Validação e Envio da Transferência via Account Abstraction
@@ -278,7 +308,8 @@ export function Wallet() {
   if (isLoading) return <div className="p-8 text-center text-gray-600">Carregando carteira USP...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white shadow-md rounded-lg mt-8">
+    <>
+      <div className="max-w-4xl mx-auto p-6 bg-white/95 shadow-xl rounded-2xl mt-8 border border-slate-100">
       
       {/* Alertas de Governança */}
       {readyProposals.map(proposalId => (
@@ -299,8 +330,19 @@ export function Wallet() {
       {/* Header / Status do Identity Registry */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Dashboard do Aluno</h1>
-          <p className="text-sm text-gray-500 font-mono mt-1">{studentAddress}</p>
+          <h1 className="text-3xl font-extrabold text-blue-700 tracking-tight">Dashboard do Aluno</h1>
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
+            <p className="text-sm text-gray-600 font-mono bg-slate-100 px-3 py-1.5 rounded-md border border-slate-200 break-all">
+              {studentAddress}
+            </p>
+            <button
+              type="button"
+              onClick={handleCopyAddress}
+              className="px-3 py-1.5 text-xs font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 transition"
+            >
+              Copiar endereco
+            </button>
+          </div>
         </div>
         <div className={`mt-2 md:mt-0 px-4 py-1 rounded-full text-sm font-semibold border ${isActive ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}`}>
           {isActive ? 'Ativo no Registro' : 'Inativo no Registro'}
@@ -309,28 +351,32 @@ export function Wallet() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {/* Painel de Saldo */}
-        <div className="bg-blue-50 p-6 rounded-lg border border-blue-100 flex flex-col justify-center">
-          <h2 className="text-sm font-semibold text-blue-800 uppercase tracking-wider mb-2">Saldo em Carteira</h2>
-          <p className="text-4xl font-extrabold text-blue-900">{balance} <span className="text-xl font-medium">U$PT</span></p>
+        <div className="p-6 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 shadow-sm flex flex-col justify-center">
+          <h2 className="text-xs font-bold text-blue-800 uppercase tracking-[0.18em] mb-3">Saldo em Carteira</h2>
+          <p className="text-5xl font-black text-blue-900 leading-tight tracking-tight tabular-nums">
+            {balance}
+            <span className="text-2xl font-semibold text-blue-700 ml-2">U$PT</span>
+          </p>
+          <p className="mt-3 text-sm text-blue-700/80">Disponivel para transferencias gasless na Sepolia.</p>
         </div>
 
         {/* Formulário de Transferência */}
-        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Enviar U$PT</h2>
+        <div className="bg-gradient-to-b from-white to-slate-50 p-6 rounded-xl border border-slate-200 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">Enviar U$PT</h2>
           <form onSubmit={handleTransfer} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Destinatário</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Destinatario</label>
               <input 
                 type="text" 
                 placeholder="0x..."
                 value={receiverAddress}
                 onChange={(e) => setReceiverAddress(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                className="block w-full rounded-lg border-slate-300 bg-white text-slate-800 shadow-sm p-2.5 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm outline-none"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Valor</label>
               <input 
                 type="number" 
                 step="0.01"
@@ -338,14 +384,14 @@ export function Wallet() {
                 placeholder="0.00"
                 value={transferAmount}
                 onChange={(e) => setTransferAmount(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500"
+                className="block w-full rounded-lg border-slate-300 bg-white text-slate-800 shadow-sm p-2.5 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 required
               />
             </div>
             <button 
               type="submit" 
               disabled={!isActive}
-              className="w-full bg-gray-900 text-white font-medium py-2.5 px-4 rounded-md hover:bg-gray-800 focus:ring-4 focus:ring-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="w-full bg-gradient-to-r from-slate-900 to-blue-800 text-white font-semibold py-2.5 px-4 rounded-lg hover:from-slate-800 hover:to-blue-700 focus:ring-4 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               Assinar Transação (Gasless)
             </button>
@@ -379,6 +425,18 @@ export function Wallet() {
           </form>
         </div>
       </div>
-    </div>
+      </div>
+
+      <Snackbar
+        open={copySnackbar.open}
+        autoHideDuration={2600}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={copySnackbar.severity} variant="filled" sx={{ width: '100%' }}>
+          {copySnackbar.message}
+        </Alert>
+      </Snackbar>
+    </>
   );
 }

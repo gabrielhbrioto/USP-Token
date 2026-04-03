@@ -3,15 +3,16 @@ import { DefaultLayout } from '../layouts/DefaultLayout';
 import { Login } from '../pages/Login';
 import { Authentication } from '../pages/Authentication';
 import { Certificates } from '../pages/Certificates';
-import { Governance } from '../pages/Governance';
-import { IdentityManagement } from '../pages/IdentityManagement';
-import { PaymasterManagement } from '../pages/PaymasterManagement';
-import { SystemParameters } from '../pages/SystemParameters';
+// import { Governance } from '../pages/Governance';
+// import { IdentityManagement } from '../pages/IdentityManagement';
+// import { PaymasterManagement } from '../pages/PaymasterManagement';
+// import { SystemParameters } from '../pages/SystemParameters';
 import { Wallet } from '../pages/Wallet';
-import { Dashboard } from '../pages/Dashboard';
+// import { Dashboard } from '../pages/Dashboard';
 import { ProtectedRoute } from './ProtectedRoutes';
 import { AuthProvider } from '../contexts/AuthContext';
 import { Outlet } from 'react-router-dom';
+
 
 const RootLayout = () => {
   return (
@@ -38,13 +39,13 @@ export const router = createBrowserRouter([
       {
         element: <DefaultLayout showNavbar={true} />, 
         children: [
-          { 
-            path: '/dashboard', 
-            element: 
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute> 
-          },
+          // { 
+          //   path: '/dashboard', 
+          //   element: 
+          //     <ProtectedRoute>
+          //       <Dashboard />
+          //     </ProtectedRoute> 
+          // },
           { 
             path: '/certificates', 
             element: 
@@ -52,33 +53,33 @@ export const router = createBrowserRouter([
                 <Certificates />
               </ProtectedRoute> 
           },
-          { 
-            path: '/governance', 
-            element: 
-              <ProtectedRoute>
-                <Governance />
-              </ProtectedRoute> 
-          },
-          { 
-            path: '/identity-management', 
-            element: 
-              <ProtectedRoute>
-                <IdentityManagement />
-              </ProtectedRoute> 
-          },
-          { 
-            path: '/paymaster-management', 
-            element: 
-              <ProtectedRoute>
-                <PaymasterManagement /></ProtectedRoute> 
-          },
-          { 
-            path: '/system-parameters', 
-            element: 
-              <ProtectedRoute>
-                <SystemParameters />
-              </ProtectedRoute> 
-          },
+          // { 
+          //   path: '/governance', 
+          //   element: 
+          //     <ProtectedRoute>
+          //       <Governance />
+          //     </ProtectedRoute> 
+          // },
+          // { 
+          //   path: '/identity-management', 
+          //   element: 
+          //     <ProtectedRoute>
+          //       <IdentityManagement />
+          //     </ProtectedRoute> 
+          // },
+          // { 
+          //   path: '/paymaster-management', 
+          //   element: 
+          //     <ProtectedRoute>
+          //       <PaymasterManagement /></ProtectedRoute> 
+          // },
+          // { 
+          //   path: '/system-parameters', 
+          //   element: 
+          //     <ProtectedRoute>
+          //       <SystemParameters />
+          //     </ProtectedRoute> 
+          // },
           { 
             path: '/wallet', 
             element: 

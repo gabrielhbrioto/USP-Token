@@ -1,0 +1,82 @@
+:root {
+  --usp-navbar-height: 72px;
+  --usp-bg: #141414; /* Fundo principal escuro */
+  --usp-nav-bg: #1c1c1c;
+  --usp-nav-border: #2a2a2a;
+  --usp-link: #a3a3a3;
+  --usp-link-hover: #ffffff;
+  --usp-link-active-bg: #cca43b; /* Dourado */
+  --usp-link-active-text: #000000;
+  --usp-main-text: #ffffff;
+}
+
+.usp-layout-root {
+  min-height: 100vh;
+  background-color: var(--usp-bg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.usp-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  height: var(--usp-navbar-height);
+  display: flex;
+  align-items: center;
+  background: var(--usp-nav-bg);
+  border-bottom: 1px solid var(--usp-nav-border);
+}
+
+.usp-navbar-inner {
+  width: min(1400px, 100%);
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.usp-nav-links-container {
+  display: flex;
+  gap: 1rem;
+}
+
+.usp-nav-link {
+  color: var(--usp-link);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+  padding: 0.4rem 1.2rem;
+  border-radius: 999px;
+  transition: all 0.2s ease;
+}
+
+.usp-nav-link:hover {
+  color: var(--usp-link-hover);
+}
+
+.usp-nav-link-active {
+  color: var(--usp-link-active-text) !important;
+  background: var(--usp-link-active-bg);
+  font-weight: 600;
+}
+
+.usp-avatar img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.usp-main {
+  color: var(--usp-main-text);
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.usp-main-with-navbar {
+  padding-top: calc(var(--usp-navbar-height) + 2rem);
+}

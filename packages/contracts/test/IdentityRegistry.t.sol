@@ -38,6 +38,15 @@ contract IdentityRegistryTest is Test {
         vm.stopPrank();
     }
 
+    function test_AddStudent_RevertsWhenAlreadyRegistered() public {
+        vm.startPrank(admin);
+        registry.addStudent(student, "12345");
+
+        vm.expectRevert("Ja registrado");
+        registry.addStudent(student, "12345");
+        vm.stopPrank();
+    }
+
     /// @dev Testa a lógica de snapshot para estudantes
     function test_SnapshotLogic() public {
         vm.startPrank(admin);
@@ -76,5 +85,28 @@ contract IdentityRegistryTest is Test {
         assertEq(registry.activeStudentCount(), 1);
         
         vm.stopPrank();
+    }
+
+    function test_SetStudentStatus_NoOpWhenStatusUnchanged() public {
+        vm.startPrank(admin);
+        registry.addStudent(student, "12345");
+
+        registry.setStudentStatus(student, true);
+
+        assertEq(registry.activeStudentCount(), 1);
+        assertTrue(registry.isStudentActive(student));
+        vm.stopPrank();
+    }
+
+    function test_SetStudentStatus_RevertsWhenNotRegistered() public {
+        vm.startPrank(admin);
+
+        vm.expectRevert("Nao registrado");
+        registry.setStudentStatus(student, false);
+        vm.stopPrank();
+    }
+
+    function test_SnapshotLogic_UnregisteredStudentIsInvalid() public {
+        assertFalse(registry.isStudentValidForSnapshot(student, 100));
     }
 }

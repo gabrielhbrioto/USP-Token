@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "../src/USPCertificate.sol";
 import "../src/USPToken.sol";
 import "../src/IdentityRegistry.sol";
@@ -25,6 +26,7 @@ contract USPCertificateTest is Test {
         
         // Configura permissões
         token.grantRole(keccak256("MINTER_ROLE"), admin);
+        token.grantRole(token.DEFAULT_ADMIN_ROLE(), address(cert));
         cert.grantRole(keccak256("GOVERNANCE_ROLE"), governance);
         
         // Adiciona aluno ativo e fornece tokens
@@ -90,5 +92,40 @@ contract USPCertificateTest is Test {
 
         // Garante que nenhum certificado foi emitido
         assertEq(cert.balanceOf(student), 0);
+    }
+
+    function test_SystemMintCertificate_BurnsTokensAndSetsURI() public {
+        vm.prank(admin);
+        cert.systemMintCertificate(student, "ipfs://system-metadata");
+
+        assertEq(token.balanceOf(student), 400 * 10**18);
+        assertEq(cert.ownerOf(0), student);
+        assertEq(cert.tokenURI(0), "ipfs://system-metadata");
+        assertTrue(cert.supportsInterface(type(IERC5192).interfaceId));
+        assertTrue(cert.supportsInterface(type(IERC721).interfaceId));
+    }
+
+    function test_SystemMintCertificate_FailsForInactiveStudent() public {
+        vm.startPrank(admin);
+        registry.setStudentStatus(student, false);
+        vm.expectRevert("Apenas alunos ativos podem receber");
+        cert.systemMintCertificate(student, "ipfs://system-metadata");
+        vm.stopPrank();
+    }
+
+    function test_Locked_RevertsForMissingToken() public {
+        vm.expectRevert("Token nao existe");
+        cert.locked(999);
+    }
+
+    function test_Transfer_RevertsWhenTokenIsSoulbound() public {
+        vm.prank(student);
+        token.approve(address(cert), 100 * 10**18);
+        vm.prank(student);
+        cert.redeemCertificate("ipfs://metadata");
+
+        vm.prank(student);
+        vm.expectRevert("Tokens Soulbound nao podem ser transferidos");
+        cert.transferFrom(student, address(3), 0);
     }
 }

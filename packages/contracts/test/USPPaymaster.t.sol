@@ -81,6 +81,51 @@ contract USPPaymasterTest is Test {
         assertEq(validationData, 1); // Falha
     }
 
+    function test_ValidateUserOp_Fail_InactiveStudent() public {
+        vm.prank(admin);
+        registry.setStudentStatus(student, false);
+
+        PackedUserOperation memory op = _createOp(student, targetContract);
+        vm.prank(address(mockEntryPoint));
+        (, uint256 validationData) = paymaster.validatePaymasterUserOp(op, bytes32(0), 1000);
+
+        assertEq(validationData, 1);
+    }
+
+    function test_ValidateUserOp_Fail_WhenGasLimitExceeded() public {
+        vm.prank(address(mockEntryPoint));
+        paymaster.postOp(IPaymaster.PostOpMode.opSucceeded, abi.encode(student), 0.06 ether, 0);
+
+        PackedUserOperation memory op = _createOp(student, targetContract);
+        vm.prank(address(mockEntryPoint));
+        (, uint256 validationData) = paymaster.validatePaymasterUserOp(op, bytes32(0), 1000);
+
+        assertEq(validationData, 1);
+    }
+
+    function test_ValidateUserOp_Fail_WhenEntryPointBalanceIsInsufficient() public {
+        PackedUserOperation memory op = _createOp(student, targetContract);
+
+        vm.prank(address(mockEntryPoint));
+        (, uint256 validationData) = paymaster.validatePaymasterUserOp(op, bytes32(0), 6 ether);
+
+        assertEq(validationData, 1);
+    }
+
+    function test_ValidateUserOp_SucceedsWithShortCallDataWhenZeroTargetIsWhitelisted() public {
+        paymaster.setTargetWhitelist(address(0), true);
+
+        PackedUserOperation memory op;
+        op.sender = student;
+        op.callData = hex"1234";
+
+        vm.prank(address(mockEntryPoint));
+        (bytes memory context, uint256 validationData) = paymaster.validatePaymasterUserOp(op, bytes32(0), 1000);
+
+        assertEq(validationData, 0);
+        assertEq(abi.decode(context, (address)), student);
+    }
+
     function test_PostOp_ChargesGas() public {
         bytes memory context = abi.encode(student);
         
@@ -88,6 +133,25 @@ contract USPPaymasterTest is Test {
         paymaster.postOp(IPaymaster.PostOpMode.opSucceeded, context, 0.01 ether, 0);
         
         assertEq(paymaster.gasSpentByStudent(student), 0.01 ether);
+    }
+
+    function test_SetMaxGasPerStudent_OnlyOwner() public {
+        vm.prank(student);
+        vm.expectRevert();
+        paymaster.setMaxGasPerStudent(1 ether);
+
+        vm.prank(admin);
+        paymaster.setMaxGasPerStudent(1 ether);
+        assertEq(paymaster.maxGasPerStudent(), 1 ether);
+    }
+
+    function test_WithdrawTo_OnlyOwner() public {
+        vm.prank(student);
+        vm.expectRevert();
+        paymaster.withdrawTo(payable(student), 1 ether);
+
+        vm.prank(admin);
+        paymaster.withdrawTo(payable(student), 0.5 ether);
     }
 
     function _createOp(address sender, address target) internal pure returns (PackedUserOperation memory) {

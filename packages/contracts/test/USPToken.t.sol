@@ -67,4 +67,10 @@ contract USPTokenTest is Test {
         vm.expectRevert(); // AccessControl error
         token.mint(studentA, 100);
     }
+
+    function test_Mint_ToInactiveStudent_Reverts() public {
+        vm.prank(admin);
+        vm.expectRevert("Destinatario nao e um estudante ativo");
+        token.mint(studentB, 100);
+    }
 }

@@ -117,6 +117,9 @@ contract StudentGovernanceTest is Test {
         
         // Validação Final: O custo no certificado mudou?
         assertEq(cert.certificateCost(), 50 * 10**18);
+
+        vm.expectRevert("Ja processada");
+        governance.execute(proposalId);
     }
 
     // Testa se a execução da proposta funciona corretamente
@@ -222,7 +225,245 @@ contract StudentGovernanceTest is Test {
         assertEq(balanceAfter, balanceBefore - pcost + governance.voteReward()); // votou e recebeu reward, mas caução consumida
     }
 
+    function test_CastVote_CanRecordNoVotes() public {
+        uint256 pcost = governance.proposalCost();
+        vm.prank(admin);
+        token.mint(student1, pcost + 10 * 10**18);
+        vm.prank(student1);
+        token.approve(address(governance), pcost);
+
+        vm.roll(12);
+        vm.prank(student1);
+        governance.propose(address(cert), abi.encodeWithSelector(USPCertificate.setCertificateCost.selector, 222 * 10**18), "vote no");
+
+        vm.prank(student1);
+        governance.castVote(0, false);
+
+        assertEq(token.balanceOf(student1), 65 * 10**18);
+    }
+
+    function test_CastVote_RevertsOnDoubleVote() public {
+        uint256 pcost = governance.proposalCost();
+        vm.prank(admin);
+        token.mint(student1, pcost + 10 * 10**18);
+        vm.prank(student1);
+        token.approve(address(governance), pcost);
+
+        vm.roll(14);
+        vm.prank(student1);
+        governance.propose(address(cert), abi.encodeWithSelector(USPCertificate.setCertificateCost.selector, 333 * 10**18), "double vote");
+
+        vm.prank(student1);
+        governance.castVote(0, true);
+
+        vm.prank(student1);
+        vm.expectRevert("Ja votou");
+        governance.castVote(0, false);
+    }
+
+    function test_CastVote_RevertsAfterDeadline() public {
+        uint256 pcost = governance.proposalCost();
+        vm.prank(admin);
+        token.mint(student1, pcost + 10 * 10**18);
+        vm.prank(student1);
+        token.approve(address(governance), pcost);
+
+        vm.roll(18);
+        vm.prank(student1);
+        governance.propose(address(cert), abi.encodeWithSelector(USPCertificate.setCertificateCost.selector, 888 * 10**18), "late vote");
+
+        vm.warp(block.timestamp + governance.votingPeriod() + 1);
+        vm.prank(student1);
+        vm.expectRevert("Votacao encerrada");
+        governance.castVote(0, true);
+    }
+
+    function test_CastVote_RevertsForInvalidSnapshot() public {
+        uint256 pcost = governance.proposalCost();
+        address lateStudent = address(16);
+
+        vm.prank(admin);
+        token.mint(student1, pcost + 10 * 10**18);
+        vm.prank(student1);
+        token.approve(address(governance), pcost);
+
+        vm.roll(22);
+        vm.prank(student1);
+        governance.propose(address(cert), abi.encodeWithSelector(USPCertificate.setCertificateCost.selector, 889 * 10**18), "snapshot check");
+
+        vm.roll(23);
+        vm.startPrank(admin);
+        registry.addStudent(lateStudent, "LATE");
+        token.mint(lateStudent, INITIAL_STUDENT_BALANCE);
+        vm.stopPrank();
+
+        vm.prank(lateStudent);
+        vm.expectRevert("Elegibilidade invalida para este snapshot");
+        governance.castVote(0, true);
+    }
+
+    function test_Propose_RevertsWhenStudentIsInactive() public {
+        vm.prank(admin);
+        registry.setStudentStatus(student1, false);
+
+        vm.prank(student1);
+        vm.expectRevert("Apenas alunos ativos");
+        governance.propose(address(cert), abi.encodeWithSelector(USPCertificate.setCertificateCost.selector, 777 * 10**18), "inactive proposer");
+    }
+
+    function test_Propose_RevertsWithoutAllowance() public {
+        uint256 pcost = governance.proposalCost();
+        vm.prank(admin);
+        token.mint(student1, pcost);
+
+        vm.prank(student1);
+        vm.expectRevert();
+        governance.propose(address(cert), abi.encodeWithSelector(USPCertificate.setCertificateCost.selector, 776 * 10**18), "no allowance");
+    }
+
+    function test_Propose_RevertsWhenTransferFromReturnsFalse() public {
+        IdentityRegistry localRegistry = new IdentityRegistry(admin);
+        FalseTransferToken localToken = new FalseTransferToken();
+        StudentGovernance localGovernance = new StudentGovernance(address(localRegistry), address(localToken), admin);
+
+        vm.startPrank(admin);
+        localRegistry.addStudent(student1, "S1");
+        localToken.mint(student1, 100 * 10**18);
+        vm.stopPrank();
+
+        vm.prank(student1);
+        localToken.burn(1 * 10**18);
+
+        vm.prank(student1);
+        vm.expectRevert("Falha no deposito da caucao");
+        localGovernance.propose(address(cert), abi.encodeWithSelector(USPCertificate.setCertificateCost.selector, 776 * 10**18), "false transferFrom");
+    }
+
+    function test_Execute_RejectsWhenQuorumMetButVotesAreAgainst() public {
+        uint256 pcost = governance.proposalCost();
+        vm.prank(admin);
+        token.mint(student1, pcost + 10 * 10**18);
+        vm.prank(student1);
+        token.approve(address(governance), pcost);
+
+        vm.roll(16);
+        vm.prank(student1);
+        governance.propose(address(cert), abi.encodeWithSelector(USPCertificate.setCertificateCost.selector, 444 * 10**18), "quorum but rejected");
+
+        vm.prank(student1); governance.castVote(0, true);
+        vm.prank(student2); governance.castVote(0, false);
+        vm.prank(student3); governance.castVote(0, false);
+
+        vm.warp(block.timestamp + governance.votingPeriod() + 1);
+        governance.execute(0);
+
+        assertTrue(cert.certificateCost() != 444 * 10**18);
+    }
+
+    function test_SetGovernanceParams_RevertsWhenCalledDirectly() public {
+        vm.expectRevert("Apenas via Governanca");
+        governance.setGovernanceParams(40, 1 days, 6 * 10**18);
+    }
+
+    function test_Execute_UsesDeadAddressFallbackWhenBurnFails() public {
+        IdentityRegistry localRegistry = new IdentityRegistry(admin);
+        BurnFailToken localToken = new BurnFailToken();
+        StudentGovernance localGovernance = new StudentGovernance(address(localRegistry), address(localToken), admin);
+
+        vm.startPrank(admin);
+        localRegistry.addStudent(student1, "S1");
+        localRegistry.addStudent(student2, "S2");
+        localRegistry.addStudent(student3, "S3");
+        localToken.mint(student1, 100 * 10**18);
+        localToken.mint(student2, 100 * 10**18);
+        localToken.mint(student3, 100 * 10**18);
+        vm.stopPrank();
+
+        uint256 pcost = localGovernance.proposalCost();
+        vm.prank(student1);
+        localToken.approve(address(localGovernance), pcost);
+
+        vm.roll(30);
+        vm.prank(student1);
+        localGovernance.propose(address(cert), abi.encodeWithSelector(USPCertificate.setCertificateCost.selector, 555 * 10**18), "burn fallback");
+
+        vm.prank(student1); localGovernance.castVote(0, true);
+        vm.prank(student2); localGovernance.castVote(0, false);
+        vm.prank(student3); localGovernance.castVote(0, false);
+
+        vm.warp(block.timestamp + localGovernance.votingPeriod() + 1);
+        localGovernance.execute(0);
+
+        assertEq(localToken.balanceOf(address(0xdead)), pcost);
+    }
+
+    function test_Execute_RevertsWhenTargetCallFails() public {
+        AlwaysRevertTarget target = new AlwaysRevertTarget();
+        uint256 pcost = governance.proposalCost();
+
+        vm.prank(admin);
+        token.mint(student1, pcost);
+        vm.prank(student1);
+        token.approve(address(governance), pcost);
+
+        vm.prank(student1);
+        governance.propose(address(target), hex"1234", "reverting target");
+
+        vm.prank(student1); governance.castVote(0, true);
+        vm.prank(student2); governance.castVote(0, true);
+        vm.prank(student3); governance.castVote(0, true);
+
+        vm.warp(block.timestamp + governance.votingPeriod() + 1);
+        vm.expectRevert("Falha na chamada externa");
+        governance.execute(0);
+    }
+
     // Testa a alteração da recompensa por voto via governança
+
+        function test_Execute_SkipsDepositReturnWhenAlreadyMarkedAndNeedsMoreThanThreeVotes() public {
+            address student4 = address(20);
+            address student5 = address(21);
+            address student6 = address(22);
+            address student7 = address(23);
+            address student8 = address(24);
+
+            vm.startPrank(admin);
+            registry.addStudent(student4, "S4");
+            registry.addStudent(student5, "S5");
+            registry.addStudent(student6, "S6");
+            registry.addStudent(student7, "S7");
+            registry.addStudent(student8, "S8");
+            vm.stopPrank();
+
+            vm.store(address(governance), bytes32(uint256(3)), bytes32(uint256(50)));
+
+            uint256 pcost = governance.proposalCost();
+            vm.prank(student1);
+            token.approve(address(governance), pcost);
+
+            vm.roll(40);
+            vm.prank(student1);
+            governance.propose(address(cert), abi.encodeWithSelector(USPCertificate.setCertificateCost.selector, 666 * 10**18), "skip deposit return");
+
+            vm.prank(student1); governance.castVote(0, true);
+            vm.prank(student2); governance.castVote(0, true);
+            vm.prank(student3); governance.castVote(0, true);
+            vm.prank(student4); governance.castVote(0, true);
+
+            bytes32 proposalBaseSlot = keccak256(abi.encode(uint256(0), uint256(7)));
+            bytes32 proposerAndDepositSlot = bytes32(uint256(proposalBaseSlot) + 8);
+            bytes32 currentPackedValue = vm.load(address(governance), proposerAndDepositSlot);
+            vm.store(
+                address(governance),
+                proposerAndDepositSlot,
+                bytes32(uint256(currentPackedValue) | (uint256(1) << 168))
+            );
+
+            vm.warp(block.timestamp + governance.votingPeriod() + 1);
+            governance.execute(0);
+
+            assertEq(token.balanceOf(student1), 5 * 10**18);
+        }
     function test_VoteReward_Change() public {
         uint256 NEW_REWARD = 42 * 10**18;
         uint256 pcost = governance.proposalCost();
@@ -453,4 +694,38 @@ contract StudentGovernanceTest is Test {
         assertEq(cert.certificateCost(), 999 * 10**18);
     }
 
+}
+
+contract BurnFailToken is ERC20 {
+    constructor() ERC20("BurnFailToken", "BFT") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function burn(uint256) external pure {
+        revert("burn failed");
+    }
+}
+
+contract FalseTransferToken is ERC20 {
+    constructor() ERC20("FalseTransferToken", "FTT") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
+    }
+
+    function transferFrom(address, address, uint256) public pure override returns (bool) {
+        return false;
+    }
+}
+
+contract AlwaysRevertTarget {
+    fallback() external payable {
+        revert("target reverted");
+    }
 }

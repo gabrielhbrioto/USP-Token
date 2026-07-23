@@ -83,6 +83,7 @@ Funções públicas
   - Ação: cunha `amount` tokens para `to` usando `_mint`.
   - Requer: `identityRegistry.isStudentActive(to)` ser `true`.
   - Reverte com mensagem: `Destinatario nao e um estudante ativo` se o destinatário for inativo.
+  - Requer também que o chamador tenha `MINTER_ROLE`; caso contrário, o `AccessControl` reverte.
 
 Funções internas
 - `function _update(address from, address to, uint256 value) internal override`
